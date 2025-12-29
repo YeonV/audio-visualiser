@@ -1,4 +1,4 @@
-﻿// src/components/constants.ts
+// --- Schemas for Visualiser Effects ---
 
 export const VISUALISER_SCHEMAS: Record<string, any[]> = {
   gif: [
@@ -646,7 +646,7 @@ export const VISUAL_TO_BACKEND_EFFECT: Record<string, string> = {
 }
 
 // Order effect properties same as EffectsComplex
-export const configOrder = ['color', 'number', 'integer', 'string', 'boolean']
+const configOrder = ['color', 'number', 'integer', 'string', 'boolean']
 
 export const orderEffectProperties = (
   schema: any,
@@ -687,6 +687,3 @@ export const orderEffectProperties = (
     .sort((a) => (a.id === 'color' ? -1 : 1))
     .sort((a) => (a.id === 'gradient' ? -1 : 1))
 }
-
-
-

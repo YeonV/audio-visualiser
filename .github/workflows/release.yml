@@ -1,0 +1,90 @@
+on:
+  push:
+    branches: [main]
+name: Release Audio Visualiser
+
+jobs:
+  build-and-release:
+    name: Build & Release
+    if: "startsWith(github.event.head_commit.message, 'Release ')"
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [24.x]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get version
+        id: package-version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build module
+        run: npm run build
+
+      - name: Create release archive
+        run: |
+          cd dist
+          zip -r ../yz-audio-visualiser-${{ steps.package-version.outputs.version }}.zip .
+          cd ..
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ steps.package-version.outputs.version }}
+          release_name: v${{ steps.package-version.outputs.version }}
+          body: |
+            🎵 Audio Visualiser Module v${{ steps.package-version.outputs.version }}
+            
+            **Features:**
+            - 31 stunning WebGL visual effects
+            - Dual-mode: Standalone (microphone) & Integrated (LedFx backend)
+            - Real-time beat detection and frequency analysis
+            - Customizable shaders and presets
+            
+            **Installation:**
+            1. Extract `yz-audio-visualiser.js` from the zip
+            2. Copy to your `public/modules/` directory
+            3. Load via dynamic import in your application
+            
+            **Module Size:** ~387 KB (gzip: ~114 KB)
+            
+            Commit: ${{ github.sha }}
+          draft: false
+          prerelease: false
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./yz-audio-visualiser-${{ steps.package-version.outputs.version }}.zip
+          asset_name: yz-audio-visualiser-${{ steps.package-version.outputs.version }}.zip
+          asset_content_type: application/zip
+
+      - name: Upload module file
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./dist/yz-audio-visualiser.js
+          asset_name: yz-audio-visualiser.js
+          asset_content_type: application/javascript

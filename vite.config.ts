@@ -19,6 +19,10 @@ const libraryConfig: UserConfig = {
   ],
   define: { 'process.env.NODE_ENV': JSON.stringify('production') },
   resolve: sharedResolve,
+  server: {
+    port: 3001,
+    open: true
+  },
   build: {
     outDir: 'dist',
     lib: {
@@ -43,6 +47,10 @@ const libraryConfig: UserConfig = {
 const pagesConfig: UserConfig = {
   plugins: [react()],
   resolve: sharedResolve,
+  server: {
+    port: 3001,
+    open: true
+  },
   build: {
     outDir: 'dist'
   }

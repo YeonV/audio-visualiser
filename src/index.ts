@@ -1,13 +1,12 @@
 // src/index.ts
 
-// Export the main component
-export { AudioVisualiser } from './components/AudioVisualiser'
+// Export the main component (standalone version)
+export { default as AudioVisualiser } from './VisualiserIso'
 
 // Export types
-export type { AudioVisualiserProps } from './components/AudioVisualiser.types'
-export type { WebGLVisualisationType } from './components/WebGLVisualiser'
+export type { WebGLVisualisationType } from './WebGLVisualiser'
 
-// Export isPremium flag
-export { isPremium } from './components/AudioVisualiser.types'
+// Export constants
+export { DEFAULT_CONFIGS, VISUAL_TO_BACKEND_EFFECT, VISUALISER_SCHEMAS } from './visualizerConstants'
 
 // This is what will be attached to window.YzAudioVisualiser when built as IIFE

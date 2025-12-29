@@ -1,5 +1,5 @@
 import { useRef, useEffect, useCallback } from 'react'
-import { useTheme } from '@mui/material/styles'
+import type { Theme } from '@mui/material/styles'
 import {
   createShader,
   createProgram,
@@ -84,6 +84,7 @@ interface WebGLVisualiserProps {
     mid: number
     high: number
   }
+  theme: Theme
 }
 
 interface Particle {
@@ -105,7 +106,8 @@ export const WebGLVisualiser = ({
   config,
   customShader,
   beatData,
-  frequencyBands
+  frequencyBands,
+  theme
 }: WebGLVisualiserProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const glRef = useRef<WebGLRenderingContext | null>(null)
@@ -120,15 +122,13 @@ export const WebGLVisualiser = ({
   const isDrawingRef = useRef<boolean>(false)
   const themeColorsRef = useRef({ primary: [0, 0, 0], secondary: [0, 0, 0] })
 
-  const theme = useTheme()
-
   // Update refs in useEffect to avoid recreating callbacks
   useEffect(() => {
     themeColorsRef.current = {
-      primary: hexToRgb(theme.palette.primary.main),
-      secondary: hexToRgb(theme.palette.secondary.main)
+      primary: hexToRgb(theme?.palette?.primary?.main || '#1976d2'),
+      secondary: hexToRgb(theme?.palette?.secondary?.main || '#dc004e')
     }
-  }, [theme.palette.primary.main, theme.palette.secondary.main])
+  }, [theme?.palette?.primary?.main, theme?.palette?.secondary?.main])
 
   // Update audio data ref in render (no useEffect needed)
   audioDataRef.current = audioData
