@@ -1,6 +1,7 @@
 # Audio Visualiser
 
-[![original author](https://img.shields.io/badge/ORIGINAL_AUTHOR-mattallmighty-purple.svg?logo=github&logoColor=white)](https://github.com/mattallmighty) [![refactored by](https://img.shields.io/badge/REFACTORED_BY-Blade-darkred.svg?logo=github&logoColor=white)](https://github.com/YeonV)
+[![original author](https://img.shields.io/badge/ORIGINAL_AUTHOR-mattallmighty-purple.svg?logo=github&logoColor=white)](https://github.com/mattallmighty) [![refactored by](https://img.shields.io/badge/REFACTORED_BY-Blade-darkred.svg?logo=github&logoColor=white)](https://github.com/YeonV) [![live demo](https://img.shields.io/badge/LIVE_DEMO-GitHub_Pages-00ADD8.svg?logo=react&logoColor=white)](https://yeonv.github.io/audio-visualiser/)
+
 
 A powerful, dual-mode audio visualisation component with real-time WebGL effects. Built with React, TypeScript, and Web Audio API.
 
