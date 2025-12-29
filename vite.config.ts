@@ -49,6 +49,7 @@ const libraryConfig: UserConfig = {
 const pagesConfig: UserConfig = {
   plugins: [react()],
   resolve: sharedResolve,
+  base: process.env.GITHUB_PAGES === 'true' ? '/audio-visualiser/' : '/',
   server: {
     port: 3001,
     open: true
@@ -58,7 +59,7 @@ const pagesConfig: UserConfig = {
   }
 }
 
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ mode }: { mode: string }) => {
   if (mode === 'pages') {
     console.log('Building in PAGES mode...')
     return pagesConfig

@@ -1,7 +1,7 @@
 {
   "name": "@yeonv/yz-audio-visualiser",
   "private": true,
-  "version": "0.0.3",
+  "version": "0.0.4",
   "type": "module",
   "main": "./dist/yz-audio-visualiser.umd.js",
   "module": "./dist/yz-audio-visualiser.es.js",
@@ -50,8 +50,8 @@
     "react-dom": "^19.1.0",
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.38.0",
-    "vite": "^7.0.4",
-    "vite-plugin-dts": "^3.9.1"
+    "vite": "^7.3.0",
+    "vite-plugin-dts": "^4.5.4"
   },
   "peerDependencies": {
     "react": "^19.1.0",
