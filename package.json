@@ -1,15 +1,15 @@
 {
-  "name": "@yeonv/yz-audio-visualiser",
+  "name": "@mattallmighty/audio-visualiser",
   "private": true,
   "version": "0.0.4",
   "type": "module",
-  "main": "./dist/yz-audio-visualiser.umd.js",
-  "module": "./dist/yz-audio-visualiser.es.js",
-  "types": "./dist/yz-audio-visualiser.d.ts",
+  "main": "./dist/audio-visualiser.umd.js",
+  "module": "./dist/audio-visualiser.es.js",
+  "types": "./dist/audio-visualiser.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/yz-audio-visualiser.es.js",
-      "require": "./dist/yz-audio-visualiser.umd.js"
+      "import": "./dist/audio-visualiser.es.js",
+      "require": "./dist/audio-visualiser.umd.js"
     }
   },
   "files": [

@@ -325,7 +325,7 @@ export function usePostProcessing(
   const updateTime = useCallback((deltaTime: number, beatData?: BeatData): void => {
     const passes = passesRef.current
     // Update passes that have time-based animations
-    if (passes.glitch) passes.glitch.update(deltaTime)
+    if (passes.glitch) passes.glitch.update()
     if (passes.filmGrain) passes.filmGrain.update(deltaTime)
     if (passes.badTV) passes.badTV.update(deltaTime)
     if (passes.kaleidoscope) passes.kaleidoscope.update(deltaTime, beatData)

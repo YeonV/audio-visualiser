@@ -214,6 +214,118 @@ export const VISUALISER_SCHEMAS: Record<string, any[]> = {
       type: 'boolean'
     }
   ],
+  hexgrid: [
+    {
+      id: 'hexSize',
+      title: 'Hex Size',
+      type: 'integer',
+      min: 10,
+      max: 100,
+      step: 1
+    },
+    {
+      id: 'gridRadius',
+      title: 'Grid Radius',
+      type: 'integer',
+      min: 5,
+      max: 30,
+      step: 1
+    },
+    {
+      id: 'strokeWidth',
+      title: 'Stroke Width',
+      type: 'number',
+      min: 0.5,
+      max: 5.0,
+      step: 0.5
+    },
+    {
+      id: 'glowIntensity',
+      title: 'Glow Intensity',
+      type: 'number',
+      min: 0,
+      max: 50,
+      step: 1
+    },
+    {
+      id: 'rippleSpeed',
+      title: 'Ripple Speed',
+      type: 'number',
+      min: 0.1,
+      max: 5.0,
+      step: 0.1
+    },
+    {
+      id: 'primaryColor',
+      title: 'Primary Color',
+      type: 'color'
+    },
+    {
+      id: 'secondaryColor',
+      title: 'Secondary Color',
+      type: 'color'
+    },
+    {
+      id: 'backgroundColor',
+      title: 'Background Color',
+      type: 'color'
+    },
+    {
+      id: 'bassMultiplier',
+      title: 'Bass Multiplier',
+      type: 'number',
+      min: 0,
+      max: 5.0,
+      step: 0.1
+    },
+    {
+      id: 'midMultiplier',
+      title: 'Mid Multiplier',
+      type: 'number',
+      min: 0,
+      max: 5.0,
+      step: 0.1
+    },
+    {
+      id: 'highMultiplier',
+      title: 'High Multiplier',
+      type: 'number',
+      min: 0,
+      max: 5.0,
+      step: 0.1
+    },
+    {
+      id: 'rotationSpeed',
+      title: 'Rotation Speed',
+      type: 'number',
+      min: 0,
+      max: 1.0,
+      step: 0.01
+    },
+    {
+      id: 'pulseOnBeat',
+      title: 'Pulse on Beat',
+      type: 'boolean'
+    },
+    {
+      id: 'fillHexagons',
+      title: 'Fill Hexagons',
+      type: 'boolean'
+    },
+    {
+      id: 'audioSensitivity',
+      title: 'Audio Sensitivity',
+      type: 'number',
+      min: 0.1,
+      max: 3.0,
+      step: 0.1
+    },
+    {
+      id: 'developer_mode',
+      title: 'Developer Mode',
+      type: 'boolean'
+    }
+  ],
   // --- NEW MATRIX EFFECTS ---
   gameoflife: [
     {
@@ -556,6 +668,25 @@ export const DEFAULT_CONFIGS: Record<string, any> = {
   matrix: { sensitivity: 1.5, developer_mode: false },
   terrain: { sensitivity: 1.5, developer_mode: false },
   geometric: { sensitivity: 1.5, developer_mode: false },
+  hexgrid: {
+    hexSize: 30,
+    gridRadius: 12,
+    strokeWidth: 1.5,
+    glowIntensity: 15,
+    rippleSpeed: 2,
+    primaryColor: '#00ffff',
+    secondaryColor: '#ff00ff',
+    backgroundColor: '#1a1a2e',
+    audioSensitivity: 1.2,
+    bassMultiplier: 2.0,
+    midMultiplier: 1.0,
+    highMultiplier: 0.6,
+    rotationSpeed: 0.1,
+    pulseOnBeat: true,
+    fillHexagons: false,
+    perspectiveDepth: 0.3,
+    developer_mode: false
+  },
   // --- NEW MATRIX EFFECTS ---
   gameoflife: {
     cell_size: 8,

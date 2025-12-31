@@ -92,11 +92,11 @@ export interface AudioAnalyserConfig {
 }
 
 const DEFAULT_CONFIG: Required<AudioAnalyserConfig> = {
-  fftSize: 2048,
-  smoothingTimeConstant: 0.4,
+  fftSize: 4096, // Increased from 2048 for better frequency resolution
+  smoothingTimeConstant: 0.5, // Slightly smoother (was 0.4)
   minDecibels: -90,
   maxDecibels: -10,
-  beatThreshold: 0.4,
+  beatThreshold: 0.15, // Lowered from 0.4 to match BPMDetector tuning
   beatDecay: 0.95,
   bpmMin: 60,
   bpmMax: 200,
@@ -252,8 +252,24 @@ function determineMood(
   }
 }
 
-export function useAudioAnalyser(config: AudioAnalyserConfig = {}) {
-  const cfg = useMemo(() => ({ ...DEFAULT_CONFIG, ...config }), [config]);
+// Stable empty config to avoid recreating object on each render
+const EMPTY_CONFIG: AudioAnalyserConfig = {};
+
+export function useAudioAnalyser(config: AudioAnalyserConfig = EMPTY_CONFIG) {
+  // Use individual properties to avoid infinite loops from object reference changes
+  const cfg = useMemo(
+    () => ({ ...DEFAULT_CONFIG, ...config }),
+    [
+      config.fftSize,
+      config.smoothingTimeConstant,
+      config.minDecibels,
+      config.maxDecibels,
+      config.beatThreshold,
+      config.beatDecay,
+      config.bpmMin,
+      config.bpmMax,
+    ]
+  );
 
   const [isInitialized, setIsInitialized] = useState(false);
   const [isListening, setIsListening] = useState(false);
@@ -303,7 +319,13 @@ export function useAudioAnalyser(config: AudioAnalyserConfig = {}) {
   // Beat detection state
   const beatIntensityRef = useRef<number>(0);
   const peakEnergyRef = useRef<number>(0);
-  const previousSpectrumRef = useRef<number[]>([]);
+  const previousSpectrumRef = useRef<Float32Array | null>(null);
+
+  // Reusable typed arrays to avoid memory allocations per frame
+  const frequencyDataRef = useRef<Uint8Array | null>(null);
+  const waveformDataRef = useRef<Uint8Array | null>(null);
+  const normalizedFreqRef = useRef<Float32Array | null>(null);
+  const waveArrayRef = useRef<Float32Array | null>(null);
 
   useEffect(() => {
     // Initialize detectors
@@ -330,22 +352,31 @@ export function useAudioAnalyser(config: AudioAnalyserConfig = {}) {
       if (!analyser || !bpmDetector || !buildUpDetector) return;
 
       const bufferLength = analyser.frequencyBinCount;
-      const frequencyData = new Uint8Array(bufferLength);
-      const waveformData = new Uint8Array(bufferLength);
+
+      // Reuse typed arrays instead of creating new ones each frame
+      // This prevents massive memory allocations that cause browser crashes
+      if (!frequencyDataRef.current || frequencyDataRef.current.length !== bufferLength) {
+        frequencyDataRef.current = new Uint8Array(bufferLength);
+        waveformDataRef.current = new Uint8Array(bufferLength);
+        normalizedFreqRef.current = new Float32Array(bufferLength);
+        waveArrayRef.current = new Float32Array(bufferLength);
+        previousSpectrumRef.current = new Float32Array(bufferLength);
+      }
+
+      const frequencyData = frequencyDataRef.current;
+      const waveformData = waveformDataRef.current!;
+      const normalizedFreq = normalizedFreqRef.current!;
+      const waveArray = waveArrayRef.current!;
 
       analyser.getByteFrequencyData(frequencyData);
       analyser.getByteTimeDomainData(waveformData);
 
-      // Convert to arrays and normalize
-      // Use TypedArrays for performance
-      const normalizedFreq = new Float32Array(bufferLength);
+      // Convert to arrays and normalize - reusing existing arrays
       for (let i = 0; i < bufferLength; i++) {
         normalizedFreq[i] = frequencyData[i] / 255;
       }
 
-      // Waveform -1 to 1 for Meyda
-      // We can use a Float32Array for Meyda input as well
-      const waveArray = new Float32Array(bufferLength);
+      // Waveform -1 to 1 for Meyda - reusing existing array
       for (let i = 0; i < bufferLength; i++) {
         waveArray[i] = (waveformData[i] - 128) / 128;
       }
@@ -409,14 +440,18 @@ export function useAudioAnalyser(config: AudioAnalyserConfig = {}) {
 
       // Calculate spectral flux (rate of change)
       let spectralFlux = 0;
-      if (previousSpectrumRef.current.length === normalizedFreq.length) {
+      const prevSpectrum = previousSpectrumRef.current;
+      if (prevSpectrum && prevSpectrum.length === normalizedFreq.length) {
         for (let i = 0; i < normalizedFreq.length; i++) {
-          const diff = normalizedFreq[i] - previousSpectrumRef.current[i];
+          const diff = normalizedFreq[i] - prevSpectrum[i];
           if (diff > 0) spectralFlux += diff;
         }
         spectralFlux /= normalizedFreq.length;
       }
-      previousSpectrumRef.current = [...normalizedFreq];
+      // Copy current spectrum to previous - reuse existing array instead of spreading
+      if (prevSpectrum) {
+        prevSpectrum.set(normalizedFreq);
+      }
 
       // BPM Detection using histogram method
       const bpmResult: BPMResult = bpmDetector.detect(overall, bass);
@@ -583,7 +618,13 @@ export function useAudioAnalyser(config: AudioAnalyserConfig = {}) {
     // Reset state
     beatIntensityRef.current = 0;
     peakEnergyRef.current = 0;
-    previousSpectrumRef.current = [];
+    previousSpectrumRef.current = null;
+
+    // Clear reusable arrays to free memory
+    frequencyDataRef.current = null;
+    waveformDataRef.current = null;
+    normalizedFreqRef.current = null;
+    waveArrayRef.current = null;
   }, []);
 
   // Tap tempo function

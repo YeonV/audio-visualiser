@@ -112,8 +112,10 @@ export interface ButterchurnVisualiserRef {
   getCurrentPresetName: () => string
 }
 
+type AudioDataArray = number[] | Float32Array
+
 interface ButterchurnVisualiserProps {
-  audioData: number[]
+  audioData: AudioDataArray
   isPlaying: boolean
   config: ButterchurnConfig
   onConfigChange?: (config: Partial<ButterchurnConfig>) => void
@@ -380,8 +382,9 @@ const ButterchurnVisualiser = forwardRef<ButterchurnVisualiserRef, ButterchurnVi
 
       // Calculate bass and overall intensity from melbank
       const bassEnd = Math.floor(audioData.length * 0.2)
-      const bassSum = audioData.slice(0, bassEnd).reduce((a, b) => a + b, 0) / bassEnd
-      const overallSum = audioData.reduce((a, b) => a + b, 0) / audioData.length
+      const audioArr = Array.from(audioData)
+      const bassSum = audioArr.slice(0, bassEnd).reduce((a, b) => a + b, 0) / bassEnd
+      const overallSum = audioArr.reduce((a, b) => a + b, 0) / audioData.length
 
       // Modulate oscillator frequency based on bass (20-400 Hz range)
       const baseFreq = 60

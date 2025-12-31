@@ -290,8 +290,11 @@ export interface AstrofoxVisualiserRef {
   renderControls: () => React.ReactNode
 }
 
+/** Audio data array type - supports both number[] and Float32Array */
+type AudioDataArray = number[] | Float32Array
+
 interface AstrofoxVisualiserProps {
-  audioData: number[]
+  audioData: AudioDataArray
   isPlaying: boolean
   config: AstrofoxConfig
   onConfigChange?: (config: Partial<AstrofoxConfig>) => void
@@ -319,7 +322,7 @@ const DEFAULT_BAR_SPECTRUM: Omit<BarSpectrumLayer, 'id' | 'name'> = {
   shadowHeight: 50,
   shadowColor: '#1e1b4b',
   minFrequency: 20,
-  maxFrequency: 6000,
+  maxFrequency: 20000,  // Full audible range (was 6000, cutting off highs)
   maxDecibels: -12,
   smoothing: 0.5,
   mirror: false
@@ -341,7 +344,7 @@ const DEFAULT_WAVE_SPECTRUM: Omit<WaveSpectrumLayer, 'id' | 'name'> = {
   fill: true,
   fillColor: 'rgba(34, 211, 238, 0.3)',
   minFrequency: 20,
-  maxFrequency: 6000,
+  maxFrequency: 20000,  // Full audible range (was 6000, cutting off highs)
   smoothing: 0.6
 }
 
@@ -1003,7 +1006,7 @@ const AstrofoxVisualiser = forwardRef<AstrofoxVisualiserRef, AstrofoxVisualiserP
     // Parse raw audio data (0-255 Uint8Array) using FFTParser with per-layer frequency filtering
     const parseAudioData = useCallback(
       (
-        data: number[] | Uint8Array,
+        data: AudioDataArray | Uint8Array,
         layerId: string,
         minFrequency: number,
         maxFrequency: number,
@@ -1012,8 +1015,16 @@ const AstrofoxVisualiser = forwardRef<AstrofoxVisualiserRef, AstrofoxVisualiserP
         targetBins?: number
       ): Float32Array => {
         const parser = getFFTParser(layerId, minFrequency, maxFrequency, maxDecibels, smoothing)
-        // Convert number[] to Uint8Array if needed (assuming data is already 0-255 frequency data)
-        const inputData = data instanceof Uint8Array ? data : new Uint8Array(data.map(v => Math.round(v * 255)))
+        // Convert to Uint8Array if needed (assuming data is already 0-255 frequency data)
+        let inputData: Uint8Array
+        if (data instanceof Uint8Array) {
+          inputData = data
+        } else if (data instanceof Float32Array) {
+          inputData = new Uint8Array(data.length)
+          for (let i = 0; i < data.length; i++) inputData[i] = Math.round(data[i] * 255)
+        } else {
+          inputData = new Uint8Array(data.map(v => Math.round(v * 255)))
+        }
         return parser.parseFFT(inputData, targetBins)
       },
       [getFFTParser]
@@ -1037,7 +1048,7 @@ const AstrofoxVisualiser = forwardRef<AstrofoxVisualiserRef, AstrofoxVisualiserP
       (
         ctx: CanvasRenderingContext2D,
         layer: BarSpectrumLayer,
-        data: number[],
+        data: AudioDataArray,
         centerX: number,
         centerY: number
       ) => {
@@ -1104,7 +1115,7 @@ const AstrofoxVisualiser = forwardRef<AstrofoxVisualiserRef, AstrofoxVisualiserP
       (
         ctx: CanvasRenderingContext2D,
         layer: WaveSpectrumLayer,
-        data: number[],
+        data: AudioDataArray,
         centerX: number,
         centerY: number
       ) => {
@@ -1167,7 +1178,7 @@ const AstrofoxVisualiser = forwardRef<AstrofoxVisualiserRef, AstrofoxVisualiserP
       (
         ctx: CanvasRenderingContext2D,
         layer: SoundWaveLayer,
-        data: number[],
+        data: AudioDataArray,
         centerX: number,
         centerY: number
       ) => {
@@ -1233,7 +1244,7 @@ const AstrofoxVisualiser = forwardRef<AstrofoxVisualiserRef, AstrofoxVisualiserP
       (
         ctx: CanvasRenderingContext2D,
         layer: SoundWave2Layer,
-        data: number[],
+        data: AudioDataArray,
         centerX: number,
         centerY: number
       ) => {
@@ -1288,11 +1299,13 @@ const AstrofoxVisualiser = forwardRef<AstrofoxVisualiserRef, AstrofoxVisualiserP
       (
         ctx: CanvasRenderingContext2D,
         layer: TextLayer,
-        data: number[],
+        data: AudioDataArray,
         centerX: number,
         centerY: number
       ) => {
-        const avgAmplitude = data.reduce((a, b) => a + b, 0) / data.length
+        let sum = 0
+        for (let i = 0; i < data.length; i++) sum += data[i]
+        const avgAmplitude = data.length > 0 ? sum / data.length : 0
         const reactiveScale = layer.audioReactive ? 1 + avgAmplitude * layer.reactiveScale : 1
 
         ctx.save()
@@ -1320,7 +1333,7 @@ const AstrofoxVisualiser = forwardRef<AstrofoxVisualiserRef, AstrofoxVisualiserP
       (
         ctx: CanvasRenderingContext2D,
         layer: ImageLayer,
-        _data: number[],
+        _data: AudioDataArray,
         centerX: number,
         centerY: number
       ) => {
@@ -1598,11 +1611,13 @@ const AstrofoxVisualiser = forwardRef<AstrofoxVisualiserRef, AstrofoxVisualiserP
       (
         ctx: CanvasRenderingContext2D,
         layer: Geometry3DLayer,
-        data: number[],
+        data: AudioDataArray,
         centerX: number,
         centerY: number
       ) => {
-        const avgAmplitude = data.length > 0 ? data.reduce((a, b) => a + b, 0) / data.length : 0
+        let sum = 0
+        for (let i = 0; i < data.length; i++) sum += data[i]
+        const avgAmplitude = data.length > 0 ? sum / data.length : 0
         const audioRotation = layer.audioReactive ? avgAmplitude * 2 : 0
 
         ctx.save()

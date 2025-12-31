@@ -40,11 +40,23 @@ import {
   Cloud,
   AutoAwesome,
   MusicNote,
-  AutoFixHigh
+  AutoFixHigh,
+  ChevronLeft,
+  ChevronRight
 } from '@mui/icons-material'
 import { FullScreen, useFullScreenHandle } from 'react-full-screen'
 import WebGLVisualiser, { WebGLVisualisationType } from './WebGLVisualiser'
+
+// Extended type that includes special visualizers not handled by WebGL
+type VisualisationType = WebGLVisualisationType | 'butterchurn' | 'astrofox' | 'fluid' | 'wavemountain' | 'hexgrid' | 'spiralgalaxy' | 'auroraborealis' | 'frequencyrings' | 'neonterrain'
 import ButterchurnVisualiser, { ButterchurnConfig } from './ButterchurnVisualiser'
+import FluidVisualiser, { FluidConfig, DEFAULT_FLUID_CONFIG } from './FluidVisualiser'
+import WaveMountainVisualiser, { WaveMountainConfig, DEFAULT_WAVEMOUNTAIN_CONFIG } from './WaveMountainVisualiser'
+import HexGridVisualiser, { HexGridConfig, DEFAULT_HEXGRID_CONFIG } from './HexGridVisualiser'
+import SpiralGalaxyVisualiser, { SpiralGalaxyConfig, DEFAULT_SPIRALGALAXY_CONFIG } from './SpiralGalaxyVisualiser'
+import AuroraBorealisVisualiser, { AuroraBorealisConfig, DEFAULT_AURORABOREALIS_CONFIG } from './AuroraBorealisVisualiser'
+import FrequencyRingsVisualiser, { FrequencyRingsConfig, DEFAULT_FREQUENCYRINGS_CONFIG } from './FrequencyRingsVisualiser'
+import NeonTerrainVisualiser, { NeonTerrainConfig, DEFAULT_NEONTERRAIN_CONFIG } from './NeonTerrainVisualiser'
 import AstrofoxVisualiser, { AstrofoxConfig, DEFAULT_ASTROFOX_CONFIG, ASTROFOX_PRESETS, getAstrofoxPresetLayers, AstrofoxVisualiserRef } from './AstrofoxVisualiser'
 import { gifFragmentShader } from './shaders'
 import useAudioAnalyser from './audioanalyzer/useAudioAnalyser'
@@ -57,6 +69,10 @@ import {
 import SimpleConfigForm from './SimpleConfigForm'
 import { usePostProcessing, PostProcessingConfig } from './usePostProcessing'
 import { PostProcessingPanel } from './PostProcessingPanel'
+import SpectrumAnalyzer from './SpectrumAnalyzer'
+import AudioStatsPanel from './AudioStatsPanel'
+import PresetsPanel from './PresetsPanel'
+import ConfigurationPanel from './ConfigurationPanel'
 
 interface VisualiserIsoProps {
   theme: Theme
@@ -67,6 +83,26 @@ interface VisualiserIsoProps {
 }
 
 const STORAGE_KEY = 'visualiser_state_v1'
+
+// Ordered list of all visualizer types for navigation
+const VISUALIZER_TYPES: VisualisationType[] = [
+  // Original Effects
+  'gif', 'matrix', 'terrain', 'geometric', 'concentric', 'particles',
+  'bars3d', 'radial3d', 'waveform3d', 'bleep',
+  // 2D Effects
+  'bands', 'bandsmatrix', 'blocks', 'equalizer2d',
+  // Matrix Effects
+  'blender', 'clone', 'digitalrain', 'flame', 'gameoflife', 'image',
+  'keybeat2d', 'noise2d', 'plasma2d', 'plasmawled2d', 'radial', 'soap',
+  'texter', 'waterfall',
+  // Milkdrop
+  'butterchurn',
+  // Layer-Based
+  'astrofox',
+  // Simulation
+  'fluid', 'wavemountain', 'hexgrid', 'spiralgalaxy', 'auroraborealis',
+  'frequencyrings', 'neonterrain'
+]
 
 const VisualiserIso = ({
   theme,
@@ -107,7 +143,7 @@ const VisualiserIso = ({
   // Local state
   const [isPlaying, setIsPlaying] = useState(true) // Default to playing for auto-start
   const [fullScreen, setFullScreen] = useState(false)
-  const [visualType, setVisualType] = useState<WebGLVisualisationType>(savedState?.visualType || 'gif')
+  const [visualType, setVisualType] = useState<VisualisationType>(savedState?.visualType || 'gif')
   
   // Store custom configs for ALL visualiser types in one object
   const [allConfigs, setAllConfigs] = useState<Record<string, any>>(() => {
@@ -153,6 +189,27 @@ const VisualiserIso = ({
   const [astrofoxConfig, setAstrofoxConfig] = useState<AstrofoxConfig>(savedState?.astrofoxConfig || DEFAULT_ASTROFOX_CONFIG)
   const [astrofoxReady, setAstrofoxReady] = useState(false)
 
+  // Fluid state
+  const [fluidConfig, setFluidConfig] = useState<FluidConfig>(savedState?.fluidConfig || DEFAULT_FLUID_CONFIG)
+
+  // Wave Mountain state
+  const [waveMountainConfig, setWaveMountainConfig] = useState<WaveMountainConfig>(savedState?.waveMountainConfig || DEFAULT_WAVEMOUNTAIN_CONFIG)
+
+  // Hex Grid state
+  const [hexGridConfig, setHexGridConfig] = useState<HexGridConfig>(savedState?.hexGridConfig || DEFAULT_HEXGRID_CONFIG)
+
+  // Spiral Galaxy state
+  const [spiralGalaxyConfig, setSpiralGalaxyConfig] = useState<SpiralGalaxyConfig>(savedState?.spiralGalaxyConfig || DEFAULT_SPIRALGALAXY_CONFIG)
+
+  // Aurora Borealis state
+  const [auroraBorealisConfig, setAuroraBorealisConfig] = useState<AuroraBorealisConfig>(savedState?.auroraBorealisConfig || DEFAULT_AURORABOREALIS_CONFIG)
+
+  // Frequency Rings state
+  const [frequencyRingsConfig, setFrequencyRingsConfig] = useState<FrequencyRingsConfig>(savedState?.frequencyRingsConfig || DEFAULT_FREQUENCYRINGS_CONFIG)
+
+  // Neon Terrain state
+  const [neonTerrainConfig, setNeonTerrainConfig] = useState<NeonTerrainConfig>(savedState?.neonTerrainConfig || DEFAULT_NEONTERRAIN_CONFIG)
+
   const [saveError, setSaveError] = useState<string | null>(null)
 
   // Save state to localStorage
@@ -163,7 +220,14 @@ const VisualiserIso = ({
       fxEnabled,
       ppConfig,
       butterchurnConfig,
-      astrofoxConfig
+      astrofoxConfig,
+      fluidConfig,
+      waveMountainConfig,
+      hexGridConfig,
+      spiralGalaxyConfig,
+      auroraBorealisConfig,
+      frequencyRingsConfig,
+      neonTerrainConfig
     }
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave))
@@ -174,7 +238,7 @@ const VisualiserIso = ({
         setSaveError('Storage full! Some images may be too large to save.')
       }
     }
-  }, [visualType, allConfigs, fxEnabled, ppConfig, butterchurnConfig, astrofoxConfig])
+  }, [visualType, allConfigs, fxEnabled, ppConfig, butterchurnConfig, astrofoxConfig, fluidConfig, waveMountainConfig, hexGridConfig, spiralGalaxyConfig, auroraBorealisConfig, frequencyRingsConfig, neonTerrainConfig])
 
   // Post-processing hook
   const [ppState, ppControls] = usePostProcessing(
@@ -257,13 +321,26 @@ const VisualiserIso = ({
   }
 
   const handleTypeChange = useCallback(
-    (type: WebGLVisualisationType) => {
+    (type: VisualisationType) => {
       setVisualType(type)
       setActiveCustomShader(undefined)
       setShowCode(false)
     },
     []
   )
+
+  // Navigate to previous/next visualizer
+  const handlePrevVisualizer = useCallback(() => {
+    const currentIndex = VISUALIZER_TYPES.indexOf(visualType)
+    const prevIndex = currentIndex <= 0 ? VISUALIZER_TYPES.length - 1 : currentIndex - 1
+    handleTypeChange(VISUALIZER_TYPES[prevIndex])
+  }, [visualType, handleTypeChange])
+
+  const handleNextVisualizer = useCallback(() => {
+    const currentIndex = VISUALIZER_TYPES.indexOf(visualType)
+    const nextIndex = currentIndex >= VISUALIZER_TYPES.length - 1 ? 0 : currentIndex + 1
+    handleTypeChange(VISUALIZER_TYPES[nextIndex])
+  }, [visualType, handleTypeChange])
 
   const handleApplyShader = () => {
     setActiveCustomShader(shaderCode)
@@ -279,6 +356,20 @@ const VisualiserIso = ({
       })
     } else if (visualType === 'astrofox') {
       setAstrofoxConfig(DEFAULT_ASTROFOX_CONFIG)
+    } else if (visualType === 'fluid') {
+      setFluidConfig(DEFAULT_FLUID_CONFIG)
+    } else if (visualType === 'wavemountain') {
+      setWaveMountainConfig(DEFAULT_WAVEMOUNTAIN_CONFIG)
+    } else if (visualType === 'hexgrid') {
+      setHexGridConfig(DEFAULT_HEXGRID_CONFIG)
+    } else if (visualType === 'spiralgalaxy') {
+      setSpiralGalaxyConfig(DEFAULT_SPIRALGALAXY_CONFIG)
+    } else if (visualType === 'auroraborealis') {
+      setAuroraBorealisConfig(DEFAULT_AURORABOREALIS_CONFIG)
+    } else if (visualType === 'frequencyrings') {
+      setFrequencyRingsConfig(DEFAULT_FREQUENCYRINGS_CONFIG)
+    } else if (visualType === 'neonterrain') {
+      setNeonTerrainConfig(DEFAULT_NEONTERRAIN_CONFIG)
     } else {
       setAllConfigs(prev => ({
         ...prev,
@@ -339,7 +430,7 @@ const VisualiserIso = ({
       : calculateFrequencyBands(backendAudioData || [])
 
   const triggerRandomVisual = useCallback(() => {
-    const types: WebGLVisualisationType[] = [
+    const types: VisualisationType[] = [
       // Original Effects
       'gif',
       'matrix',
@@ -370,7 +461,15 @@ const VisualiserIso = ({
       'radial',
       'soap',
       'texter',
-      'waterfall'
+      'waterfall',
+      // Simulation
+      'fluid',
+      'wavemountain',
+      'hexgrid',
+      'spiralgalaxy',
+      'auroraborealis',
+      'frequencyrings',
+      'neonterrain'
     ]
     const nextType = types[Math.floor(Math.random() * types.length)]
     if (nextType !== visualType) {
@@ -470,13 +569,25 @@ const VisualiserIso = ({
               </Box>
 
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-                <FormControl size="small" sx={{ minWidth: 200 }}>
-                  <InputLabel>Visualization</InputLabel>
-                  <Select
-                    value={visualType}
-                    label="Visualization"
-                    onChange={(e) => handleTypeChange(e.target.value as WebGLVisualisationType)}
-                  >
+                {/* Visualizer Navigation */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <Tooltip title="Previous visualizer">
+                    <IconButton
+                      onClick={handlePrevVisualizer}
+                      size="small"
+                      sx={{ bgcolor: 'action.hover', '&:hover': { bgcolor: 'action.selected' } }}
+                    >
+                      <ChevronLeft />
+                    </IconButton>
+                  </Tooltip>
+
+                  <FormControl size="small" sx={{ minWidth: 200 }}>
+                    <InputLabel>Visualization</InputLabel>
+                    <Select
+                      value={visualType}
+                      label="Visualization"
+                      onChange={(e) => handleTypeChange(e.target.value as WebGLVisualisationType)}
+                    >
                     <MenuItem disabled sx={{ opacity: 0.5, fontSize: '0.75rem' }}>
                       Original Effects
                     </MenuItem>
@@ -522,8 +633,29 @@ const VisualiserIso = ({
                       Layer-Based
                     </MenuItem>
                     <MenuItem value="astrofox">Astrofox (Layers)</MenuItem>
+                    <MenuItem disabled sx={{ opacity: 0.5, fontSize: '0.75rem', mt: 1 }}>
+                      Simulation
+                    </MenuItem>
+                    <MenuItem value="fluid">Fluid Simulation</MenuItem>
+                    <MenuItem value="wavemountain">Wave Mountain</MenuItem>
+                    <MenuItem value="hexgrid">Hex Grid</MenuItem>
+                    <MenuItem value="spiralgalaxy">Spiral Galaxy</MenuItem>
+                    <MenuItem value="auroraborealis">Aurora Borealis</MenuItem>
+                    <MenuItem value="frequencyrings">Frequency Rings</MenuItem>
+                    <MenuItem value="neonterrain">Neon Terrain</MenuItem>
                   </Select>
                 </FormControl>
+
+                  <Tooltip title="Next visualizer">
+                    <IconButton
+                      onClick={handleNextVisualizer}
+                      size="small"
+                      sx={{ bgcolor: 'action.hover', '&:hover': { bgcolor: 'action.selected' } }}
+                    >
+                      <ChevronRight />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
 
                 {/* Only show audio source toggle if backend is available */}
                 {hasBackend && (
@@ -656,6 +788,83 @@ const VisualiserIso = ({
                       config={astrofoxConfig}
                       onConfigChange={(update) =>
                         setAstrofoxConfig((prev) => ({ ...prev, ...update }))
+                      }
+                      frequencyBands={frequencyBands}
+                      beatData={beatData}
+                    />
+                  ) : visualType === 'fluid' ? (
+                    <FluidVisualiser
+                      audioData={activeAudioData}
+                      isPlaying={isPlaying}
+                      config={fluidConfig}
+                      onConfigChange={(update) =>
+                        setFluidConfig((prev) => ({ ...prev, ...update }))
+                      }
+                      frequencyBands={frequencyBands}
+                      beatData={beatData}
+                    />
+                  ) : visualType === 'wavemountain' ? (
+                    <WaveMountainVisualiser
+                      audioData={activeAudioData}
+                      isPlaying={isPlaying}
+                      config={waveMountainConfig}
+                      onConfigChange={(update) =>
+                        setWaveMountainConfig((prev) => ({ ...prev, ...update }))
+                      }
+                      frequencyBands={frequencyBands}
+                      beatData={beatData}
+                    />
+                  ) : visualType === 'hexgrid' ? (
+                    <HexGridVisualiser
+                      audioData={activeAudioData}
+                      isPlaying={isPlaying}
+                      config={hexGridConfig}
+                      onConfigChange={(update) =>
+                        setHexGridConfig((prev) => ({ ...prev, ...update }))
+                      }
+                      frequencyBands={frequencyBands}
+                      beatData={beatData}
+                    />
+                  ) : visualType === 'spiralgalaxy' ? (
+                    <SpiralGalaxyVisualiser
+                      audioData={activeAudioData}
+                      isPlaying={isPlaying}
+                      config={spiralGalaxyConfig}
+                      onConfigChange={(update) =>
+                        setSpiralGalaxyConfig((prev) => ({ ...prev, ...update }))
+                      }
+                      frequencyBands={frequencyBands}
+                      beatData={beatData}
+                    />
+                  ) : visualType === 'auroraborealis' ? (
+                    <AuroraBorealisVisualiser
+                      audioData={activeAudioData}
+                      isPlaying={isPlaying}
+                      config={auroraBorealisConfig}
+                      onConfigChange={(update) =>
+                        setAuroraBorealisConfig((prev) => ({ ...prev, ...update }))
+                      }
+                      frequencyBands={frequencyBands}
+                      beatData={beatData}
+                    />
+                  ) : visualType === 'frequencyrings' ? (
+                    <FrequencyRingsVisualiser
+                      audioData={activeAudioData}
+                      isPlaying={isPlaying}
+                      config={frequencyRingsConfig}
+                      onConfigChange={(update) =>
+                        setFrequencyRingsConfig((prev) => ({ ...prev, ...update }))
+                      }
+                      frequencyBands={frequencyBands}
+                      beatData={beatData}
+                    />
+                  ) : visualType === 'neonterrain' ? (
+                    <NeonTerrainVisualiser
+                      audioData={activeAudioData}
+                      isPlaying={isPlaying}
+                      config={neonTerrainConfig}
+                      onConfigChange={(update) =>
+                        setNeonTerrainConfig((prev) => ({ ...prev, ...update }))
                       }
                       frequencyBands={frequencyBands}
                       beatData={beatData}
@@ -801,523 +1010,47 @@ const VisualiserIso = ({
       {/* Bottom Row */}
       <Grid size={{ xs: 12, md: 8 }} key="config-panel">
         {/* Effect Configuration OR Shader Editor */}
-        <Card variant="outlined" sx={{ height: '100%' }}>
-          <CardContent>
-            <Box
-              sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}
-            >
-              <Typography variant="h6">Configuration</Typography>
-              <Box>
-                <Tooltip title="Reset to Defaults">
-                  <Button size="small" onClick={handleReset} sx={{ mr: 1 }}>
-                    Reset
-                  </Button>
-                </Tooltip>
-                <Tooltip title="Edit Shader">
-                  <IconButton
-                    onClick={() => setShowCode(!showCode)}
-                    color={showCode ? 'primary' : 'default'}
-                  >
-                    <Code />
-                  </IconButton>
-                </Tooltip>
-              </Box>
-            </Box>
-
-            {showCode ? (
-              <Box sx={{ p: 0 }}>
-                <TextField
-                  fullWidth
-                  multiline
-                  minRows={10}
-                  maxRows={15}
-                  value={shaderCode}
-                  onChange={(e) => setShaderCode(e.target.value)}
-                  variant="outlined"
-                  sx={{ fontFamily: 'monospace', mb: 2 }}
-                  inputProps={{ style: { fontFamily: 'monospace', fontSize: '12px' } }}
-                />
-                <Button variant="contained" onClick={handleApplyShader} fullWidth>
-                  Apply Shader
-                </Button>
-              </Box>
-            ) : visualType === 'butterchurn' ? (
-              <Box>
-                <Typography variant="subtitle2" sx={{ mb: 2 }}>
-                  Preset Cycling
-                </Typography>
-
-                <Box sx={{ mb: 3 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                    <Typography variant="body2">Cycle Interval</Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {butterchurnConfig.cycleInterval === 0 ? 'Off' : `${butterchurnConfig.cycleInterval}s`}
-                    </Typography>
-                  </Box>
-                  <input
-                    type="range"
-                    min="0"
-                    max="120"
-                    step="5"
-                    value={butterchurnConfig.cycleInterval}
-                    onChange={(e) =>
-                      setButterchurnConfig((prev) => ({
-                        ...prev,
-                        cycleInterval: Number(e.target.value)
-                      }))
-                    }
-                    style={{ width: '100%' }}
-                  />
-                  <Typography variant="caption" color="text.secondary">
-                    Time between automatic preset changes (0 = disabled)
-                  </Typography>
-                </Box>
-
-                <Box sx={{ mb: 3 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                    <Typography variant="body2">Blend Time</Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {butterchurnConfig.blendTime}s
-                    </Typography>
-                  </Box>
-                  <input
-                    type="range"
-                    min="0"
-                    max="10"
-                    step="0.1"
-                    value={butterchurnConfig.blendTime}
-                    onChange={(e) =>
-                      setButterchurnConfig((prev) => ({
-                        ...prev,
-                        blendTime: Number(e.target.value)
-                      }))
-                    }
-                    style={{ width: '100%' }}
-                  />
-                  <Typography variant="caption" color="text.secondary">
-                    Transition duration when switching presets
-                  </Typography>
-                </Box>
-
-                <Box sx={{ mb: 2 }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={butterchurnConfig.shufflePresets}
-                      onChange={(e) =>
-                        setButterchurnConfig((prev) => ({
-                          ...prev,
-                          shufflePresets: e.target.checked
-                        }))
-                      }
-                    />
-                    <Typography variant="body2">Shuffle Presets</Typography>
-                  </label>
-                  <Typography variant="caption" color="text.secondary" sx={{ pl: 3.5 }}>
-                    Randomize preset order when cycling
-                  </Typography>
-                </Box>
-
-                <Divider sx={{ my: 2 }} />
-
-                <Typography variant="caption" color="text.secondary">
-                  Use the controls on the visualizer to manually switch presets, or adjust the cycle interval above for automatic changes.
-                </Typography>
-              </Box>
-            ) : visualType === 'astrofox' ? (
-              <Box>
-                {/* Quick Presets */}
-                <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                  Quick Presets
-                </Typography>
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
-                  {ASTROFOX_PRESETS.map((preset) => (
-                    <Button
-                      key={preset}
-                      variant="outlined"
-                      size="small"
-                      onClick={() =>
-                        setAstrofoxConfig((prev) => ({
-                          ...prev,
-                          layers: getAstrofoxPresetLayers(preset)
-                        }))
-                      }
-                      sx={{ textTransform: 'capitalize' }}
-                    >
-                      {preset}
-                    </Button>
-                  ))}
-                </Box>
-
-                {/* Background Color */}
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                  <Typography variant="body2">Background:</Typography>
-                  <input
-                    type="color"
-                    value={astrofoxConfig.backgroundColor}
-                    onChange={(e) =>
-                      setAstrofoxConfig((prev) => ({
-                        ...prev,
-                        backgroundColor: e.target.value
-                      }))
-                    }
-                    style={{ width: 40, height: 30, cursor: 'pointer', border: 'none' }}
-                  />
-                  <Typography variant="caption" sx={{ fontFamily: 'monospace' }}>
-                    {astrofoxConfig.backgroundColor}
-                  </Typography>
-                </Box>
-
-                <Divider sx={{ my: 2 }} />
-
-                {/* Full Layer Controls from Astrofox component */}
-                {astrofoxReady && astrofoxRef.current?.renderControls()}
-                {!astrofoxReady && (
-                  <Typography variant="caption" color="text.secondary">
-                    Loading layer controls...
-                  </Typography>
-                )}
-              </Box>
-            ) : (
-              (() => {
-                // Use custom form component if provided (integrated mode)
-                if (ConfigFormComponent && effects) {
-                  const backendEffectType = VISUAL_TO_BACKEND_EFFECT[visualType]
-                  const schemaProperties =
-                    backendEffectType && effects[backendEffectType]
-                      ? orderEffectProperties(
-                          effects[backendEffectType].schema,
-                          effects[backendEffectType].hidden_keys,
-                          effects[backendEffectType].advanced_keys,
-                          config.advanced
-                        )
-                      : VISUALISER_SCHEMAS[visualType] || []
-
-                  return (
-                    <ConfigFormComponent
-                      handleEffectConfig={handleEffectConfig}
-                      virtId="visualiser"
-                      schemaProperties={schemaProperties}
-                      model={config}
-                      selectedType={visualType}
-                      descriptions="Show"
-                    />
-                  )
-                }
-
-                // Fallback to simple form (standalone mode)
-                return <SimpleConfigForm config={config} onChange={handleEffectConfig} />
-              })()
-            )}
-
-            {/* FX Panel - Collapsible */}
-            {fxEnabled && (
-              <Box sx={{ mt: 3, borderTop: 1, borderColor: 'divider', pt: 2 }}>
-                <Box
-                  sx={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    mb: 1,
-                    cursor: 'pointer'
-                  }}
-                  onClick={() => setShowFxPanel(!showFxPanel)}
-                >
-                  <Typography
-                    variant="subtitle2"
-                    sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
-                  >
-                    <AutoFixHigh fontSize="small" color="secondary" />
-                    Post-Processing Effects
-                    {ppState.enabledEffects.length > 0 && (
-                      <Typography component="span" variant="caption" color="text.secondary">
-                        ({ppState.enabledEffects.length} active)
-                      </Typography>
-                    )}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {showFxPanel ? '▲' : '▼'}
-                  </Typography>
-                </Box>
-
-                {showFxPanel && (
-                  <Box sx={{ maxHeight: 400, overflowY: 'auto' }}>
-                    <PostProcessingPanel
-                      config={ppConfig}
-                      onChange={(newConfig) =>
-                        setPpConfig((prev) => ({ ...prev, ...newConfig }))
-                      }
-                      enabledEffects={ppState.enabledEffects}
-                    />
-                  </Box>
-                )}
-              </Box>
-            )}
-          </CardContent>
-        </Card>
+        <ConfigurationPanel
+          visualType={visualType}
+          showCode={showCode}
+          setShowCode={setShowCode}
+          shaderCode={shaderCode}
+          setShaderCode={setShaderCode}
+          handleApplyShader={handleApplyShader}
+          handleReset={handleReset}
+          astrofoxConfig={astrofoxConfig}
+          setAstrofoxConfig={setAstrofoxConfig}
+          astrofoxReady={astrofoxReady}
+          astrofoxRef={astrofoxRef}
+          butterchurnConfig={butterchurnConfig}
+          setButterchurnConfig={setButterchurnConfig}
+          fluidConfig={fluidConfig}
+          setFluidConfig={setFluidConfig}
+          fxEnabled={fxEnabled}
+          setFxEnabled={setFxEnabled}
+          showFxPanel={showFxPanel}
+          setShowFxPanel={setShowFxPanel}
+          ppConfig={ppConfig}
+          setPpConfig={setPpConfig}
+          ppState={ppState}
+          config={config}
+          setConfig={() => {}} // Not used directly in new structure but prop required
+          handleEffectConfig={handleEffectConfig}
+          ConfigFormComponent={ConfigFormComponent}
+          effects={effects}
+        />
       </Grid>
 
       <Grid size={{ xs: 12, md: 4 }} key="presets-panel">
-        {/* Presets */}
-        <Card variant="outlined" sx={{ height: '100%' }}>
-          <CardContent>
-            <Typography variant="h6" gutterBottom>
-              Presets
-            </Typography>
-            <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-              Quickly switch between different moods.
-            </Typography>
-
-            <Stack spacing={2}>
-              <Button onClick={() => handleTypeChange(visualType)} variant="outlined" fullWidth>
-                DEFAULT
-              </Button>
-              <Button
-                onClick={() =>
-                  setAllConfigs((prev) => ({
-                    ...prev,
-                    [visualType]: {
-                      ...prev[visualType],
-                      sensitivity: 2.5,
-                      brightness: 1.2,
-                      smoothing: 0.2
-                    }
-                  }))
-                }
-                variant="outlined"
-                fullWidth
-                color="secondary"
-              >
-                HIGH ENERGY
-              </Button>
-              <Button
-                onClick={() =>
-                  setAllConfigs((prev) => ({
-                    ...prev,
-                    [visualType]: {
-                      ...prev[visualType],
-                      sensitivity: 0.8,
-                      smoothing: 0.9,
-                      speed: 0.5
-                    }
-                  }))
-                }
-                variant="outlined"
-                fullWidth
-                color="info"
-              >
-                CHILL
-              </Button>
-            </Stack>
-
-            {audioSource === 'mic' && (
-              <Box sx={{ mt: 3, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
-                <Typography variant="caption" display="block" gutterBottom sx={{ fontWeight: 'bold', mb: 1.5 }}>
-                  AUDIO STATS
-                </Typography>
-
-                {/* BPM with confidence */}
-                <Box sx={{ mb: 1.5 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                    <Typography variant="caption">BPM</Typography>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Typography variant="caption" fontWeight="bold" sx={{ color: 'primary.main' }}>
-                        {micData.bpm} <Typography component="span" variant="caption" sx={{ opacity: 0.7 }}>({Math.round(micData.confidence * 100)}%)</Typography>
-                      </Typography>
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        sx={{
-                          minWidth: '30px',
-                          height: '20px',
-                          fontSize: '0.65rem',
-                          p: 0,
-                          lineHeight: 1
-                        }}
-                        onClick={tapTempo}
-                      >
-                        TAP
-                      </Button>
-                    </Box>
-                  </Box>
-                  <LinearProgress
-                    variant="determinate"
-                    value={micData.confidence * 100}
-                    sx={{ height: 4, borderRadius: 2, bgcolor: 'action.disabledBackground' }}
-                  />
-                </Box>
-
-                {/* Beat phase indicator */}
-                <Box sx={{ mb: 1.5 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                    <Typography variant="caption">Beat</Typography>
-                    <Box sx={{ display: 'flex', gap: 0.5 }}>
-                      {[0, 0.25, 0.5, 0.75].map((threshold, i) => (
-                        <Box
-                          key={i}
-                          sx={{
-                            width: 8,
-                            height: 8,
-                            borderRadius: '50%',
-                            bgcolor: micData.beatPhase >= threshold && micData.beatPhase < threshold + 0.25
-                              ? 'primary.main'
-                              : 'action.disabledBackground',
-                            transition: 'background-color 0.1s',
-                            boxShadow: micData.isBeat && micData.beatPhase >= threshold && micData.beatPhase < threshold + 0.25
-                              ? '0 0 8px currentColor'
-                              : 'none'
-                          }}
-                        />
-                      ))}
-                    </Box>
-                  </Box>
-                </Box>
-
-                {/* Buildup detection */}
-                <Box sx={{ mb: 1.5 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                    <Typography variant="caption">Buildup</Typography>
-                    <Typography variant="caption" fontWeight="bold" sx={{
-                      color: micData.isBuildUp ? 'warning.main' : 'text.secondary',
-                      textTransform: 'uppercase'
-                    }}>
-                      {micData.buildUpPhase} {micData.beatsToImpact > 0 && `(${micData.beatsToImpact})`}
-                    </Typography>
-                  </Box>
-                  <LinearProgress
-                    variant="determinate"
-                    value={micData.buildUpConfidence * 100}
-                    color={micData.isBuildUp ? 'warning' : 'primary'}
-                    sx={{ height: 4, borderRadius: 2, bgcolor: 'action.disabledBackground' }}
-                  />
-                </Box>
-
-                {/* Note/Key detection */}
-                <Box sx={{ mb: 1.5 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Typography variant="caption">Note</Typography>
-                    <Typography variant="caption" fontWeight="bold" sx={{
-                      color: micData.noteConfidence > 0.3 ? 'secondary.main' : 'text.secondary',
-                      fontFamily: 'monospace'
-                    }}>
-                      {micData.dominantNote} {micData.noteConfidence > 0.3 && <Typography component="span" variant="caption" sx={{ opacity: 0.7 }}>({Math.round(micData.noteConfidence * 100)}%)</Typography>}
-                    </Typography>
-                  </Box>
-                </Box>
-
-                {/* Energy level */}
-                <Box sx={{ mb: 1.5 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                    <Typography variant="caption">Energy</Typography>
-                    <Typography variant="caption" fontWeight="bold" sx={{
-                      color: micData.energy > 0.7 ? 'error.main' : micData.energy > 0.4 ? 'warning.main' : 'success.main'
-                    }}>
-                      {Math.round(micData.energy * 100)}%
-                    </Typography>
-                  </Box>
-                  <LinearProgress
-                    variant="determinate"
-                    value={micData.energy * 100}
-                    color={micData.energy > 0.7 ? 'error' : micData.energy > 0.4 ? 'warning' : 'success'}
-                    sx={{ height: 4, borderRadius: 2, bgcolor: 'action.disabledBackground' }}
-                  />
-                </Box>
-
-                {/* Valence (positiveness) */}
-                <Box sx={{ mb: 1.5 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                    <Typography variant="caption">Valence</Typography>
-                    <Typography variant="caption" fontWeight="bold" sx={{
-                      color: micData.valence > 0.6 ? 'success.main' : micData.valence < 0.4 ? 'info.main' : 'text.secondary'
-                    }}>
-                      {Math.round(micData.valence * 100)}%
-                    </Typography>
-                  </Box>
-                  <LinearProgress
-                    variant="determinate"
-                    value={micData.valence * 100}
-                    color={micData.valence > 0.6 ? 'success' : micData.valence < 0.4 ? 'info' : 'primary'}
-                    sx={{ height: 4, borderRadius: 2, bgcolor: 'action.disabledBackground' }}
-                  />
-                </Box>
-
-                {/* Mood/Genre */}
-                <Box sx={{ mb: 1.5 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Typography variant="caption">Mood</Typography>
-                    <Typography variant="caption" fontWeight="bold" sx={{
-                      color: micData.mood === 'intense' ? 'error.main'
-                        : micData.mood === 'upbeat' ? 'success.main'
-                        : micData.mood === 'driving' ? 'warning.main'
-                        : micData.mood === 'chill' ? 'info.main'
-                        : micData.mood === 'ambient' ? 'secondary.main'
-                        : 'text.secondary',
-                      textTransform: 'capitalize'
-                    }}>
-                      {micData.mood}
-                    </Typography>
-                  </Box>
-                </Box>
-
-                {/* Frequency bands */}
-                <Typography variant="caption" display="block" sx={{ mt: 2, mb: 1, opacity: 0.7 }}>
-                  Frequency Bands
-                </Typography>
-
-                <Box sx={{ mb: 1 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.25 }}>
-                    <Typography variant="caption" sx={{ minWidth: 35 }}>Bass</Typography>
-                    <Typography variant="caption" sx={{ opacity: 0.7, minWidth: 30, textAlign: 'right' }}>{micData.bass.toFixed(2)}</Typography>
-                  </Box>
-                  <LinearProgress
-                    variant="determinate"
-                    value={Math.min(micData.bass * 100, 100)}
-                    color="error"
-                    sx={{ height: 6, borderRadius: 1, bgcolor: 'action.disabledBackground' }}
-                  />
-                </Box>
-
-                <Box sx={{ mb: 1 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.25 }}>
-                    <Typography variant="caption" sx={{ minWidth: 35 }}>Mid</Typography>
-                    <Typography variant="caption" sx={{ opacity: 0.7, minWidth: 30, textAlign: 'right' }}>{micData.mid.toFixed(2)}</Typography>
-                  </Box>
-                  <LinearProgress
-                    variant="determinate"
-                    value={Math.min(micData.mid * 100, 100)}
-                    color="warning"
-                    sx={{ height: 6, borderRadius: 1, bgcolor: 'action.disabledBackground' }}
-                  />
-                </Box>
-
-                <Box sx={{ mb: 0 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.25 }}>
-                    <Typography variant="caption" sx={{ minWidth: 35 }}>High</Typography>
-                    <Typography variant="caption" sx={{ opacity: 0.7, minWidth: 30, textAlign: 'right' }}>{micData.high.toFixed(2)}</Typography>
-                  </Box>
-                  <LinearProgress
-                    variant="determinate"
-                    value={Math.min(micData.high * 100, 100)}
-                    color="info"
-                    sx={{ height: 6, borderRadius: 1, bgcolor: 'action.disabledBackground' }}
-                  />
-                </Box>
-              </Box>
-            )}
-
-            <Divider sx={{ my: 2 }} />
-            <Button
-              onClick={handleResetAll}
-              variant="text"
-              color="error"
-              size="small"
-              fullWidth
-              sx={{ opacity: 0.7 }}
-            >
-              Reset All Data
-            </Button>
-          </CardContent>
-        </Card>
+        <PresetsPanel
+          handleTypeChange={handleTypeChange}
+          visualType={visualType}
+          setAllConfigs={setAllConfigs}
+          handleResetAll={handleResetAll}
+          audioSource={audioSource}
+          micData={micData}
+          tapTempo={tapTempo}
+        />
       </Grid>
     </Grid>
 
