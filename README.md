@@ -1,11 +1,10 @@
 # Audio Visualiser
 
-[![original author](https://img.shields.io/badge/ORIGINAL_AUTHOR-mattallmighty-purple.svg?logo=github&logoColor=white)](https://github.com/mattallmighty) [![refactored by](https://img.shields.io/badge/REFACTORED_BY-Blade-darkred.svg?logo=github&logoColor=white)](https://github.com/YeonV) [![live demo](https://img.shields.io/badge/LIVE_DEMO-GitHub_Pages-00ADD8.svg?logo=react&logoColor=white)](https://yeonv.github.io/audio-visualiser/)
-
+[![original author](https://img.shields.io/badge/ORIGINAL_AUTHOR-mattallmighty-purple.svg?logo=github&logoColor=white)](https://github.com/mattallmighty) [![refactored by](https://img.shields.io/badge/REFACTORED_BY-Blade-darkred.svg?logo=github&logoColor=white)](https://github.com/mattallmighty) [![live demo](https://img.shields.io/badge/LIVE_DEMO-GitHub_Pages-00ADD8.svg?logo=react&logoColor=white)](https://mattallmighty.github.io/audio-visualiser/)
 
 A powerful, dual-mode audio visualisation component with real-time WebGL effects. Built with React, TypeScript, and Web Audio API.
 
-**Originally created by [mattallmighty](https://github.com/mattallmighty)** for the [LedFx](https://github.com/LedFx/LedFx) project as an integrated visualizer. **Refactored by [YeonV (Blade)](https://github.com/YeonV)** to support both standalone and dynamic module loading, enabling use as a standalone microphone visualizer or integrated with backend audio streams.
+**Originally created by [mattallmighty](https://github.com/mattallmighty)** for the [LedFx](https://github.com/LedFx/LedFx) project as an integrated visualizer. **Refactored by [mattallmighty (Blade)](https://github.com/mattallmighty)** to support both standalone and dynamic module loading, enabling use as a standalone microphone visualizer or integrated with backend audio streams.
 
 **This repository is a gift from Blade to mattallmighty** - creating an independent workspace where the visualizer can evolve without LedFx dependencies, while still serving as a dynamic module for the main LedFx application.
 
@@ -14,13 +13,15 @@ A powerful, dual-mode audio visualisation component with real-time WebGL effects
 This visualizer supports two distinct modes:
 
 ### 🎤 Standalone Mode (Microphone)
-- **[Try it live on GitHub Pages](https://yeonv.github.io/audio-visualiser/)**
+
+- **[Try it live on GitHub Pages](https://mattallmighty.github.io/audio-visualiser/)**
 - Real-time microphone input with Web Audio API
 - No backend dependencies required
 - Perfect for demos, presentations, or standalone exploration
 - Independent development environment for mattallmighty
 
 ### 🔗 Integrated Mode (Dynamic Module)
+
 - Load dynamically at runtime via module system
 - Receive audio data from backend (e.g., LedFx WebSocket)
 - Seamless theme integration with host application
@@ -30,14 +31,18 @@ This visualizer supports two distinct modes:
 ## 💡 Why This Refactoring?
 
 ### Dependency Isolation
+
 The original visualizer required the **Meyda** audio analysis library as a direct dependency in LedFx's main bundle. By refactoring to a dynamic module:
+
 - 🎯 **Opt-in architecture**: Users only load the visualizer module if they use it
 - 📦 **Smaller main bundle**: Meyda (~100KB) stays out of core LedFx
 - ⚡ **Faster load times**: Main app loads without visualizer overhead
 - 🔧 **Easy updates**: Module can be updated independently
 
 ### Independent Workspace
+
 This repo provides mattallmighty with:
+
 - 🎨 **Standalone development**: Work on effects without running full LedFx backend
 - 🧪 **Quick testing**: Instant microphone feedback for visual development
 - 🚀 **Faster iteration**: No build/restart cycles of main application
@@ -59,7 +64,7 @@ This repo provides mattallmighty with:
 ### Mode 1: Standalone (GitHub Pages Demo)
 
 Experience the visualizer with your microphone:
-**[Launch Standalone Demo →](https://yeonv.github.io/audio-visualiser/)**
+**[Launch Standalone Demo →](https://mattallmighty.github.io/audio-visualiser/)**
 
 No installation needed - just grant microphone access and enjoy!
 
@@ -68,39 +73,39 @@ No installation needed - just grant microphone access and enjoy!
 Load as a dynamic module with backend audio integration:
 
 ```tsx
-import { useEffect, useState } from 'react'
-import { useTheme } from '@mui/material'
+import { useEffect, useState } from "react";
+import { useTheme } from "@mui/material";
 
 function MyApp() {
-  const [AudioVisualiser, setAudioVisualiser] = useState<any>(null)
-  const [backendAudioData, setBackendAudioData] = useState<number[]>()
-  const theme = useTheme()
+  const [AudioVisualiser, setAudioVisualiser] = useState<any>(null);
+  const [backendAudioData, setBackendAudioData] = useState<number[]>();
+  const theme = useTheme();
 
   // Dynamically load the module
   useEffect(() => {
-    const script = document.createElement('script')
-    script.src = '/modules/yz-audio-visualiser.js'
+    const script = document.createElement("script");
+    script.src = "/modules/audio-visualiser.js";
     script.onload = () => {
-      setAudioVisualiser(() => (window as any).YzAudioVisualiser.AudioVisualiser)
-    }
-    document.body.appendChild(script)
-  }, [])
+      setAudioVisualiser(() => (window as any).AudioVisualiser.AudioVisualiser);
+    };
+    document.body.appendChild(script);
+  }, []);
 
   // Connect to backend audio stream
   useEffect(() => {
-    const ws = new WebSocket('ws://localhost:8888/api/websocket')
+    const ws = new WebSocket("ws://localhost:8888/api/websocket");
     ws.onmessage = (event) => {
-      const data = JSON.parse(event.data)
-      if (data.event_type === 'graph_update') {
-        setBackendAudioData(data.payload)
+      const data = JSON.parse(event.data);
+      if (data.event_type === "graph_update") {
+        setBackendAudioData(data.payload);
       }
-    }
-    return () => ws.close()
-  }, [])
+    };
+    return () => ws.close();
+  }, []);
 
   const handleClose = () => {
     // Handle dialog close
-  }
+  };
 
   return AudioVisualiser ? (
     <AudioVisualiser
@@ -112,7 +117,7 @@ function MyApp() {
     />
   ) : (
     <div>Loading visualizer...</div>
-  )
+  );
 }
 ```
 
@@ -120,15 +125,16 @@ function MyApp() {
 
 ### AudioVisualiserProps
 
-| Prop | Type | Required | Description |
-|------|------|----------|-------------|
-| `theme` | `Theme` | ✅ | MUI theme (required for styling) |
-| `effects` | `Record<string, any>` | ❌ | Backend effect schemas (integrated mode only) |
-| `backendAudioData` | `number[]` | ❌ | Real-time audio data from backend (omit for standalone mic mode) |
-| `ConfigFormComponent` | `React.ComponentType<any>` | ❌ | Custom config form component (integrated mode) |
-| `onClose` | `() => void` | ❌ | Close handler for integrated dialog mode |
+| Prop                  | Type                       | Required | Description                                                      |
+| --------------------- | -------------------------- | -------- | ---------------------------------------------------------------- |
+| `theme`               | `Theme`                    | ✅       | MUI theme (required for styling)                                 |
+| `effects`             | `Record<string, any>`      | ❌       | Backend effect schemas (integrated mode only)                    |
+| `backendAudioData`    | `number[]`                 | ❌       | Real-time audio data from backend (omit for standalone mic mode) |
+| `ConfigFormComponent` | `React.ComponentType<any>` | ❌       | Custom config form component (integrated mode)                   |
+| `onClose`             | `() => void`               | ❌       | Close handler for integrated dialog mode                         |
 
 **Mode Detection:**
+
 - If `backendAudioData` is provided → **Integrated Mode** (backend audio + mic toggle)
 - If `backendAudioData` is omitted → **Standalone Mode** (mic only, no toggle)
 
