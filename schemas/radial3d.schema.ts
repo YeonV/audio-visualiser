@@ -1,4 +1,4 @@
-import { VisualizerSchema, numberProp } from './base.schema'
+import { VisualizerSchema, numberProp, colorProp } from './base.schema'
 
 export const radial3dSchema: VisualizerSchema = {
   $id: 'radial3d',
@@ -22,6 +22,26 @@ export const radial3dSchema: VisualizerSchema = {
       minimum: 0,
       maximum: 2.0,
       ui: { order: 2, section: 'Visual' }
+    }),
+    primaryColor: colorProp('Primary Color', '#1976d2', {
+      description: 'Main color of the radial bars',
+      ui: { order: 3, section: 'Colors' }
+    }),
+    secondaryColor: colorProp('Secondary Color', '#dc004e', {
+      description: 'Secondary color for blending',
+      ui: { order: 4, section: 'Colors' }
+    }),
+    gradient: colorProp('Gradient', 'linear-gradient(90deg, #1976d2 0%, #dc004e 100%)', {
+      description: 'CSS Gradient to use instead of colors',
+      isGradient: true,
+      ui: { order: 5, section: 'Colors' }
+    }),
+    gradient_roll: numberProp('Gradient Animation Speed', 0.0, {
+      description: 'Speed of gradient movement',
+      minimum: -2.0,
+      maximum: 2.0,
+      step: 0.1,
+      ui: { order: 6, section: 'Colors' }
     })
   },
   required: ['audioSensitivity', 'audioSmoothing', 'brightness'],

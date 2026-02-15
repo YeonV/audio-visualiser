@@ -79,6 +79,7 @@ interface Particle {
   life: number
   size: number
   amplitude: number
+  index: number
 }
 
 const MAX_PARTICLES = 2000
@@ -119,6 +120,7 @@ export const WebGLVisualiser = ({
   const beatDataRef = useRef(beatData)
   const frequencyBandsRef = useRef(frequencyBands)
   const configRef = useRef(config)
+  const visualTypeRef = useRef(visualType)
 
   // Uniform location cache
   const locationsRef = useRef<Record<string, WebGLUniformLocation | null>>({})
@@ -132,6 +134,7 @@ export const WebGLVisualiser = ({
     frequencyBandsRef.current = frequencyBands
     configRef.current = config
     audioDataRef.current = audioData
+    visualTypeRef.current = visualType
   })
 
   // Update theme colors
@@ -149,6 +152,34 @@ export const WebGLVisualiser = ({
     locationsRef.current[name] = loc
     return loc
   }, [])
+
+  // Helper to handle gradient uniforms
+  const handleGradients = useCallback((gl: WebGLRenderingContext, cfg: any) => {
+    const useGradLoc = getLoc('u_useGradient')
+    const gradLoc = getLoc('u_gradient')
+    const gradRollLoc = getLoc('u_gradientRoll')
+
+    if (gradLoc && cfg.gradient) {
+      if (!gradientTextureRef.current) {
+        gradientTextureRef.current = gl.createTexture()
+        currentGradientStrRef.current = null
+      }
+      if (currentGradientStrRef.current !== cfg.gradient) {
+        const gradData = parseGradient(cfg.gradient); gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, gradientTextureRef.current)
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 256, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, gradData)
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+        currentGradientStrRef.current = cfg.gradient
+      }
+      gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, gradientTextureRef.current); gl.uniform1i(gradLoc, 1)
+      if (useGradLoc) gl.uniform1i(useGradLoc, 1)
+      if (gradRollLoc) {
+        const rollSpeed = cfg.gradient_roll ?? 0
+        gl.uniform1f(gradRollLoc, ((Date.now() - startTimeRef.current) / 1000 * rollSpeed) % 1.0)
+      }
+    } else if (useGradLoc) {
+      gl.uniform1i(useGradLoc, 0)
+    }
+  }, [getLoc])
 
   // Initialize WebGL
   const initWebGL = useCallback(() => {
@@ -178,81 +209,82 @@ export const WebGLVisualiser = ({
     let fragmentSource = customShader || fragmentShaderSource
 
     if (!customShader) {
-      if (visualType === 'particles') {
+      const type = visualType
+      if (type === 'particles') {
         vertexSource = particleVertexShader
         fragmentSource = particleFragmentShader
-      } else if (visualType === 'radial3d') {
+      } else if (type === 'radial3d') {
         fragmentSource = spectrumFragmentShader
-      } else if (visualType === 'bleep') {
+      } else if (type === 'bleep') {
         vertexSource = quadVertexShader
         fragmentSource = bleepFragmentShader
-      } else if (visualType === 'concentric') {
+      } else if (type === 'concentric') {
         vertexSource = quadVertexShader
         fragmentSource = concentricFragmentShader
-      } else if (visualType === 'gif') {
+      } else if (type === 'gif') {
         vertexSource = quadVertexShader
         fragmentSource = gifFragmentShader
-      } else if (visualType === 'matrix') {
+      } else if (type === 'matrix') {
         vertexSource = quadVertexShader
         fragmentSource = matrixRainShader
-      } else if (visualType === 'terrain') {
+      } else if (type === 'terrain') {
         vertexSource = quadVertexShader
         fragmentSource = terrainShader
-      } else if (visualType === 'geometric') {
+      } else if (type === 'geometric') {
         vertexSource = quadVertexShader
         fragmentSource = geometricShader
-      } else if (visualType === 'gameoflife') {
+      } else if (type === 'gameoflife') {
         vertexSource = quadVertexShader
         fragmentSource = gameOfLifeShader
-      } else if (visualType === 'digitalrain') {
+      } else if (type === 'digitalrain') {
         vertexSource = quadVertexShader
         fragmentSource = digitalRainShader
-      } else if (visualType === 'flame') {
+      } else if (type === 'flame') {
         vertexSource = quadVertexShader
         fragmentSource = flameShader
-      } else if (visualType === 'plasma2d') {
+      } else if (type === 'plasma2d') {
         vertexSource = quadVertexShader
         fragmentSource = plasma2dShader
-      } else if (visualType === 'equalizer2d') {
+      } else if (type === 'equalizer2d') {
         vertexSource = quadVertexShader
         fragmentSource = equalizer2dShader
-      } else if (visualType === 'noise2d') {
+      } else if (type === 'noise2d') {
         vertexSource = quadVertexShader
         fragmentSource = noise2dShader
-      } else if (visualType === 'blender') {
+      } else if (type === 'blender') {
         vertexSource = quadVertexShader
         fragmentSource = blenderShader
-      } else if (visualType === 'clone') {
+      } else if (type === 'clone') {
         vertexSource = quadVertexShader
         fragmentSource = cloneShader
-      } else if (visualType === 'bands') {
+      } else if (type === 'bands') {
         vertexSource = quadVertexShader
         fragmentSource = bandsShader
-      } else if (visualType === 'bandsmatrix') {
+      } else if (type === 'bandsmatrix') {
         vertexSource = quadVertexShader
         fragmentSource = bandsMatrixShader
-      } else if (visualType === 'blocks') {
+      } else if (type === 'blocks') {
         vertexSource = quadVertexShader
         fragmentSource = blocksShader
-      } else if (visualType === 'keybeat2d') {
+      } else if (type === 'keybeat2d') {
         vertexSource = quadVertexShader
         fragmentSource = keybeat2dShader
-      } else if (visualType === 'texter') {
+      } else if (type === 'texter') {
         vertexSource = quadVertexShader
         fragmentSource = texterShader
-      } else if (visualType === 'plasmawled2d') {
+      } else if (type === 'plasmawled2d') {
         vertexSource = quadVertexShader
         fragmentSource = plasmaWled2dShader
-      } else if (visualType === 'radial') {
+      } else if (type === 'radial') {
         vertexSource = quadVertexShader
         fragmentSource = radialShader
-      } else if (visualType === 'soap') {
+      } else if (type === 'soap') {
         vertexSource = quadVertexShader
         fragmentSource = soapShader
-      } else if (visualType === 'waterfall') {
+      } else if (type === 'waterfall') {
         vertexSource = quadVertexShader
         fragmentSource = waterfallShader
-      } else if (visualType === 'image') {
+      } else if (type === 'image') {
         vertexSource = quadVertexShader
         fragmentSource = imageShader
       }
@@ -279,7 +311,7 @@ export const WebGLVisualiser = ({
     }
 
     return true
-  }, [visualType, customShader, getLoc])
+  }, [customShader, visualType])
 
   // Apply smoothing
   const getSmoothData = useCallback(
@@ -370,13 +402,15 @@ export const WebGLVisualiser = ({
       gl.uniform3f(getLoc('u_primaryColor'), primaryColor[0], primaryColor[1], primaryColor[2])
       gl.uniform3f(getLoc('u_secondaryColor'), secondaryColor[0], secondaryColor[1], secondaryColor[2])
 
+      handleGradients(gl, cfg)
+
       gl.drawArrays(gl.TRIANGLES, 0, vertices.length / 2)
       gl.disableVertexAttribArray(positionLoc)
       if (amplitudeLoc !== -1) gl.disableVertexAttribArray(amplitudeLoc)
       if (indexLoc !== -1) gl.disableVertexAttribArray(indexLoc)
       gl.deleteBuffer(positionBuffer); gl.deleteBuffer(amplitudeBuffer); gl.deleteBuffer(indexBuffer)
     },
-    [getLoc]
+    [getLoc, handleGradients]
   )
 
   // Draw particles
@@ -399,7 +433,8 @@ export const WebGLVisualiser = ({
           vy: -Math.random() * 3 - 1,
           life: 0,
           size: Math.random() * 8 + 4,
-          amplitude: amp
+          amplitude: amp,
+          index: freqIndex / data.length
         })
       }
 
@@ -414,9 +449,9 @@ export const WebGLVisualiser = ({
 
       if (particlesRef.current.length === 0) return
 
-      const positions: number[] = [], velocities: number[] = [], lives: number[] = [], sizes: number[] = [], amplitudes: number[] = []
+      const positions: number[] = [], velocities: number[] = [], lives: number[] = [], sizes: number[] = [], amplitudes: number[] = [], indices: number[] = []
       particlesRef.current.forEach((p) => {
-        positions.push(p.x, p.y); velocities.push(p.vx, p.vy); lives.push(p.life); sizes.push(p.size); amplitudes.push(p.amplitude)
+        positions.push(p.x, p.y); velocities.push(p.vx, p.vy); lives.push(p.life); sizes.push(p.size); amplitudes.push(p.amplitude); indices.push(p.index)
       })
 
       const posBuf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, posBuf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.DYNAMIC_DRAW)
@@ -434,6 +469,9 @@ export const WebGLVisualiser = ({
       const ampBuf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, ampBuf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(amplitudes), gl.DYNAMIC_DRAW)
       const ampLoc = gl.getAttribLocation(program, 'a_amplitude'); if (ampLoc !== -1) { gl.enableVertexAttribArray(ampLoc); gl.vertexAttribPointer(ampLoc, 1, gl.FLOAT, false, 0, 0) }
 
+      const idxBuf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, idxBuf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(indices), gl.DYNAMIC_DRAW)
+      const idxLoc = gl.getAttribLocation(program, 'a_index'); if (idxLoc !== -1) { gl.enableVertexAttribArray(idxLoc); gl.vertexAttribPointer(idxLoc, 1, gl.FLOAT, false, 0, 0) }
+
       gl.uniform2f(getLoc('u_resolution'), width, height)
       gl.uniform1f(getLoc('u_time'), (Date.now() - startTimeRef.current) / 1000)
 
@@ -442,11 +480,13 @@ export const WebGLVisualiser = ({
       gl.uniform3f(getLoc('u_primaryColor'), primaryColor[0], primaryColor[1], primaryColor[2])
       gl.uniform3f(getLoc('u_secondaryColor'), secondaryColor[0], secondaryColor[1], secondaryColor[2])
 
+      handleGradients(gl, cfg)
+
       gl.drawArrays(gl.POINTS, 0, particlesRef.current.length)
-      gl.disableVertexAttribArray(posLoc); if (velLoc !== -1) gl.disableVertexAttribArray(velLoc); if (lifeLoc !== -1) gl.disableVertexAttribArray(lifeLoc); if (sizeLoc !== -1) gl.disableVertexAttribArray(sizeLoc); if (ampLoc !== -1) gl.disableVertexAttribArray(ampLoc)
-      gl.deleteBuffer(posBuf); gl.deleteBuffer(velBuf); gl.deleteBuffer(lifeBuf); gl.deleteBuffer(sizeBuf); gl.deleteBuffer(ampBuf)
+      gl.disableVertexAttribArray(posLoc); if (velLoc !== -1) gl.disableVertexAttribArray(velLoc); if (lifeLoc !== -1) gl.disableVertexAttribArray(lifeLoc); if (sizeLoc !== -1) gl.disableVertexAttribArray(sizeLoc); if (ampLoc !== -1) gl.disableVertexAttribArray(ampLoc); if (idxLoc !== -1) gl.disableVertexAttribArray(idxLoc)
+      gl.deleteBuffer(posBuf); gl.deleteBuffer(velBuf); gl.deleteBuffer(lifeBuf); gl.deleteBuffer(sizeBuf); gl.deleteBuffer(ampBuf); gl.deleteBuffer(idxBuf)
     },
-    [getLoc]
+    [getLoc, handleGradients]
   )
 
   // Draw radial visualization
@@ -484,11 +524,18 @@ export const WebGLVisualiser = ({
       gl.uniform2f(getLoc('u_resolution'), width, height)
       gl.uniform1f(getLoc('u_time'), (Date.now() - startTimeRef.current) / 1000)
 
+      const primaryColor = cfg.primaryColor ? hexToRgb(cfg.primaryColor) : themeColorsRef.current.primary
+      const secondaryColor = cfg.secondaryColor ? hexToRgb(cfg.secondaryColor) : themeColorsRef.current.secondary
+      gl.uniform3f(getLoc('u_primaryColor'), primaryColor[0], primaryColor[1], primaryColor[2])
+      gl.uniform3f(getLoc('u_secondaryColor'), secondaryColor[0], secondaryColor[1], secondaryColor[2])
+
+      handleGradients(gl, cfg)
+
       gl.drawArrays(gl.TRIANGLES, 0, vertices.length / 2)
       gl.disableVertexAttribArray(posLoc); if (ampLoc !== -1) gl.disableVertexAttribArray(ampLoc); if (idxLoc !== -1) gl.disableVertexAttribArray(idxLoc)
       gl.deleteBuffer(posBuf); gl.deleteBuffer(ampBuf); gl.deleteBuffer(idxBuf)
     },
-    [getLoc]
+    [getLoc, handleGradients]
   )
 
   // Draw waveform with 3D effect
@@ -525,11 +572,13 @@ export const WebGLVisualiser = ({
       gl.uniform3f(getLoc('u_primaryColor'), primaryColor[0], primaryColor[1], primaryColor[2])
       gl.uniform3f(getLoc('u_secondaryColor'), secondaryColor[0], secondaryColor[1], secondaryColor[2])
 
+      handleGradients(gl, cfg)
+
       gl.drawArrays(gl.TRIANGLES, 0, vertices.length / 2)
       gl.disableVertexAttribArray(posLoc); if (ampLoc !== -1) gl.disableVertexAttribArray(ampLoc); if (idxLoc !== -1) gl.disableVertexAttribArray(idxLoc)
       gl.deleteBuffer(posBuf); gl.deleteBuffer(ampBuf); gl.deleteBuffer(idxBuf)
     },
-    [getLoc]
+    [getLoc, handleGradients]
   )
 
   // Draw Bleep
@@ -564,10 +613,12 @@ export const WebGLVisualiser = ({
       gl.uniform3f(getLoc('u_primaryColor'), primaryColor[0], primaryColor[1], primaryColor[2])
       gl.uniform3f(getLoc('u_secondaryColor'), secondaryColor[0], secondaryColor[1], secondaryColor[2])
 
+      handleGradients(gl, cfg)
+
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
       gl.disableVertexAttribArray(posLoc); gl.deleteBuffer(posBuf)
     },
-    [getLoc]
+    [getLoc, handleGradients]
   )
 
   // Draw Concentric
@@ -597,10 +648,12 @@ export const WebGLVisualiser = ({
       gl.uniform3f(getLoc('u_primaryColor'), primaryColor[0], primaryColor[1], primaryColor[2])
       gl.uniform3f(getLoc('u_secondaryColor'), secondaryColor[0], secondaryColor[1], secondaryColor[2])
 
+      handleGradients(gl, cfg)
+
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
       gl.disableVertexAttribArray(posLoc); gl.deleteBuffer(posBuf)
     },
-    [getLoc]
+    [getLoc, handleGradients]
   )
 
   // Draw Custom / GIF / Matrix Effects
@@ -609,6 +662,7 @@ export const WebGLVisualiser = ({
       const program = programRef.current
       if (!program) return
       const cfg = configRef.current
+      const currentVisualType = visualTypeRef.current
 
       const sensitivity = cfg.audioSensitivity ?? cfg.sensitivity ?? cfg.multiplier ?? 1.0
       const avg = (data as any).reduce((a: number, b: number) => a + b, 0) / data.length
@@ -679,27 +733,7 @@ export const WebGLVisualiser = ({
       }
 
       // Gradient support
-      const useGradLoc = getLoc('u_useGradient')
-      const gradLoc = getLoc('u_gradient')
-      const gradRollLoc = getLoc('u_gradientRoll')
-      if (gradLoc && cfg.gradient) {
-        if (!gradientTextureRef.current) {
-          gradientTextureRef.current = gl.createTexture()
-          currentGradientStrRef.current = null // Force upload
-        }
-        if (currentGradientStrRef.current !== cfg.gradient) {
-          const gradData = parseGradient(cfg.gradient); gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, gradientTextureRef.current)
-          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 256, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, gradData)
-          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
-          currentGradientStrRef.current = cfg.gradient
-        }
-        gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, gradientTextureRef.current); gl.uniform1i(gradLoc, 1)
-        if (useGradLoc) gl.uniform1i(useGradLoc, 1)
-        if (gradRollLoc) {
-          const rollSpeed = cfg.gradient_roll ?? 0
-          gl.uniform1f(gradRollLoc, ((Date.now() - startTimeRef.current) / 1000 * rollSpeed) % 1.0)
-        }
-      } else if (useGradLoc) gl.uniform1i(useGradLoc, 0)
+      handleGradients(gl, cfg)
 
       const melBankLoc = getLoc('u_melbank')
       if (melBankLoc && data.length > 0) {
@@ -720,10 +754,10 @@ export const WebGLVisualiser = ({
       gl.uniform1f(getLoc('u_flip'), (cfg.align === 'invert' || cfg.flip) ? 1.0 : 0.0)
       gl.uniform1f(getLoc('u_blockSize'), cfg.block_count ?? cfg.block_size ?? 10.0)
       gl.uniform1f(getLoc('u_keys'), (cfg.stretch_horizontal / 6.25) || (cfg.keys ?? 16.0))
-      if (visualType === 'texter') gl.uniform1f(getLoc('u_density'), (cfg.height_percent / 10.0) || (cfg.density ?? 1.0))
-      if (visualType === 'radial') gl.uniform1f(getLoc('u_bands'), cfg.edges || cfg.bands || 32.0)
-      if (visualType === 'bands' || visualType === 'bandsmatrix') gl.uniform1f(getLoc('u_bands'), cfg.band_count || cfg.bands || 16.0)
-      if (visualType === 'waterfall') {
+      if (currentVisualType === 'texter') gl.uniform1f(getLoc('u_density'), (cfg.height_percent / 10.0) || (cfg.density ?? 1.0))
+      if (currentVisualType === 'radial') gl.uniform1f(getLoc('u_bands'), cfg.edges || cfg.bands || 32.0)
+      if (currentVisualType === 'bands' || currentVisualType === 'bandsmatrix') gl.uniform1f(getLoc('u_bands'), cfg.band_count || cfg.bands || 16.0)
+      if (currentVisualType === 'waterfall') {
         gl.uniform1f(getLoc('u_bands'), cfg.bands || 16.0)
         gl.uniform1f(getLoc('u_speed'), (3.0 / cfg.drop_secs) || (cfg.speed ?? 1.0))
       }
@@ -734,12 +768,12 @@ export const WebGLVisualiser = ({
       gl.uniform1f(getLoc('u_minSize'), cfg.min_size ?? 0.3)
       gl.uniform1f(getLoc('u_frequencyRange'), typeof cfg.frequency_range === 'number' ? cfg.frequency_range : 0.0)
       gl.uniform1f(getLoc('u_clip'), cfg.clip ? 1.0 : 0.0)
-      if (visualType === 'image') gl.uniform1f(getLoc('u_spin'), cfg.spin ? 1.0 : 0.0)
+      if (currentVisualType === 'image') gl.uniform1f(getLoc('u_spin'), cfg.spin ? 1.0 : 0.0)
 
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
       gl.disableVertexAttribArray(posLoc); gl.deleteBuffer(posBuf)
     },
-    [getLoc, visualType]
+    [getLoc, handleGradients]
   )
 
   // Main draw function
@@ -773,7 +807,7 @@ export const WebGLVisualiser = ({
     const smoothedData = getSmoothData(currentAudioData)
     if (customShader) drawCustom(gl, smoothedData, width, height)
     else {
-      switch (visualType) {
+      switch (visualTypeRef.current) {
         case 'bars3d': drawBars3D(gl, smoothedData, width, height); break
         case 'particles': drawParticles(gl, smoothedData, width, height); break
         case 'waveform3d': drawWaveform3D(gl, smoothedData, width, height); break
@@ -789,7 +823,7 @@ export const WebGLVisualiser = ({
       const bd = beatDataRef.current; pp.updateTime(deltaTime, bd ? { isBeat: bd.isBeat, beatPhase: bd.beatPhase, beatIntensity: bd.beatIntensity } : undefined); pp.render()
     }
     animationRef.current = requestAnimationFrame(draw)
-  }, [visualType, getSmoothData, drawBars3D, drawParticles, drawWaveform3D, drawRadial3D, drawBleep, drawConcentric, drawCustom, customShader])
+  }, [getSmoothData, drawBars3D, drawParticles, drawWaveform3D, drawRadial3D, drawBleep, drawConcentric, drawCustom, customShader])
 
   // Initialize and cleanup
   useEffect(() => {

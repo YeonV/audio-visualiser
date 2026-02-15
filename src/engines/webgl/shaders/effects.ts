@@ -123,6 +123,12 @@ export const particleFragmentShader = `
 export const spectrumFragmentShader = `
   precision mediump float;
 
+  uniform sampler2D u_gradient;
+  uniform bool u_useGradient;
+  uniform float u_gradientRoll;
+  uniform vec3 u_primaryColor;
+  uniform vec3 u_secondaryColor;
+
   varying float v_amplitude;
   varying float v_index;
 
@@ -132,8 +138,14 @@ export const spectrumFragmentShader = `
   }
 
   void main() {
-    float hue = v_index;
-    vec3 color = hsl2rgb(vec3(hue, 1.0, 0.5));
+    vec3 color;
+    if (u_useGradient) {
+      color = texture2D(u_gradient, vec2(fract(v_index + u_gradientRoll), 0.5)).rgb;
+    } else {
+      float hue = v_index;
+      color = hsl2rgb(vec3(hue, 1.0, 0.5));
+      color = mix(color, u_primaryColor, 0.3);
+    }
 
     // Add glow
     color += v_amplitude * 0.3;
@@ -207,6 +219,9 @@ export const bleepFragmentShader = `
   uniform vec3 u_secondaryColor;
   uniform sampler2D u_history; // 1D texture containing amplitude history
   uniform float u_time;
+  uniform sampler2D u_gradient;
+  uniform bool u_useGradient;
+  uniform float u_gradientRoll;
 
   varying vec2 v_position; // -1 to 1
 
@@ -232,7 +247,12 @@ export const bleepFragmentShader = `
     float intensity = smoothstep(thickness, 0.0, dist);
     
     // Color
-    vec3 color = mix(u_secondaryColor, u_primaryColor, amplitude);
+    vec3 color;
+    if (u_useGradient) {
+      color = texture2D(u_gradient, vec2(fract(amplitude + u_gradientRoll), 0.5)).rgb;
+    } else {
+      color = mix(u_secondaryColor, u_primaryColor, amplitude);
+    }
     
     // Add some background grid or effect
     float grid = step(0.95, fract(v_position.x * 10.0)) * 0.1;
@@ -249,6 +269,9 @@ export const concentricFragmentShader = `
   uniform vec3 u_secondaryColor;
   uniform float u_time;
   uniform float u_beat; // Accumulating beat/power value
+  uniform sampler2D u_gradient;
+  uniform bool u_useGradient;
+  uniform float u_gradientRoll;
 
   varying vec2 v_position;
 
@@ -263,7 +286,12 @@ export const concentricFragmentShader = `
     float ring = smoothstep(0.0, 0.1, val) - smoothstep(0.4, 0.5, val);
     
     // Color gradient based on distance
-    vec3 color = mix(u_primaryColor, u_secondaryColor, dist * 0.5 + 0.5);
+    vec3 color;
+    if (u_useGradient) {
+      color = texture2D(u_gradient, vec2(fract(dist * 0.5 + 0.5 + u_gradientRoll), 0.5)).rgb;
+    } else {
+      color = mix(u_primaryColor, u_secondaryColor, dist * 0.5 + 0.5);
+    }
     
     // Modulate brightness
     color *= (ring * 0.8 + 0.2);
