@@ -103,6 +103,7 @@ function generateUISchema(schema: VisualizerSchema): string {
     if (prop.description) propObj.description = prop.description
     if ('minimum' in prop && prop.minimum !== undefined) propObj.minimum = prop.minimum
     if ('maximum' in prop && prop.maximum !== undefined) propObj.maximum = prop.maximum
+    if ('step' in prop && (prop as any).step !== undefined) propObj.step = (prop as any).step
     if ('isGradient' in prop && prop.isGradient) propObj.isGradient = true
     
     // Add enum and freeSolo for butterchurn preset

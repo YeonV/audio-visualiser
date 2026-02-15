@@ -27,7 +27,7 @@ const SimpleConfigForm = ({ config, onChange, schema }: SimpleConfigFormProps) =
                   value={config[key] ?? prop.default ?? 0}
                   min={prop.minimum ?? 0}
                   max={prop.maximum ?? (prop.type === 'integer' ? 100 : (key === 'sensitivity' ? 5 : 1.0))}
-                  step={prop.type === 'integer' ? 1 : 0.01}
+                  step={prop.step ?? (prop.type === 'integer' ? 1 : 0.01)}
                   onChange={(_, val) => handleChange(key, val)}
                   valueLabelDisplay="auto"
                 />

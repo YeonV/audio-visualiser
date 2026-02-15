@@ -222,15 +222,20 @@ function parsePythonEffect(content: string, effectName: string): EffectSchema {
   }
 
   // Extract CONFIG_SCHEMA fields
-  // Match vol.Optional blocks
-  const optionalRegex = /vol\.Optional\s*\(\s*["']([^"']+)["']\s*,\s*description\s*=\s*["']([^"']*)["']\s*(?:,\s*default\s*=\s*([^)]+))?\s*\)\s*:\s*([^,]+)/gs
+  // Improved regex to capture the full validator even if it contains commas (e.g., inside vol.All/vol.Range)
+  // It matches until the next vol.Optional, vol.Required or the end of the schema definition.
+  const optionalRegex = /vol\.Optional\s*\(\s*["']([^"']+)["']\s*,\s*description\s*=\s*["']([^"']*)["']\s*(?:,\s*default\s*=\s*([\s\S]*?))?\s*\)\s*:\s*([\s\S]*?)(?=,\s*vol\.Optional|,\s*vol\.Required|(?:\s*\n\s*\})|$)/gs
 
   let match
   while ((match = optionalRegex.exec(content)) !== null) {
-    const [, id, description, defaultValue, validator] = match
+    let [ , id, description, defaultValue, validator ] = match
     
+    // Clean up trailing commas from defaultValue and validator
+    if (defaultValue) defaultValue = defaultValue.trim().replace(/,$/, '').trim()
+    if (validator) validator = validator.trim().replace(/,$/, '').trim()
+
     // Parse validator to determine type and constraints
-    const field = parseValidator(id, description, defaultValue, validator.trim())
+    const field = parseValidator(id, description, defaultValue, validator)
     if (field) {
       fields.push(field)
       defaults[id] = field.default
@@ -312,7 +317,8 @@ function parseValidator(id: string, description: string, defaultValue: string | 
     // Number type with range
     field.type = validator.includes('vol.Coerce(int)') ? 'integer' : 'number'
     
-    const rangeMatch = validator.match(/vol\.Range\s*\(\s*min\s*=\s*([^,\s)]+)(?:\s*,\s*max\s*=\s*([^,\s)]+))?\s*\)/)
+    // Improved regex to handle vol.Range(min=0, max=1) as well as vol.Range(0, 1)
+    const rangeMatch = validator.match(/vol\.Range\s*\(\s*(?:min\s*=\s*)?([^,\s)]+)(?:\s*,\s*(?:max\s*=\s*)?([^,\s)]+))?\s*\)/)
     if (rangeMatch) {
       field.min = Number(rangeMatch[1])
       if (rangeMatch[2]) {
@@ -323,7 +329,9 @@ function parseValidator(id: string, description: string, defaultValue: string | 
       if (field.type === 'integer') {
         field.step = 1
       } else {
-        const range = (field.max ?? 10) - (field.min ?? 0)
+        const min = field.min ?? 0
+        const max = field.max ?? 1
+        const range = max - min
         field.step = range > 10 ? 1 : range > 1 ? 0.1 : 0.01
       }
     }
@@ -368,7 +376,7 @@ export const VISUALISER_SCHEMAS: Record<string, VisualizerSchema> = {\n`
       const isHidden = schema.hiddenKeys.includes(field.id)
       
       output += `      "${field.id}": {\n`
-      output += `        type: '${field.type === 'color' ? 'string' : field.type === 'integer' ? 'number' : field.type}',\n`
+      output += `        type: '${field.type === 'color' ? 'string' : field.type}',\n`
       output += `        title: '${field.title}',\n`
       if (field.description) {
         output += `        description: '${field.description.replace(/'/g, "\\'")}',\n`
@@ -378,6 +386,7 @@ export const VISUALISER_SCHEMAS: Record<string, VisualizerSchema> = {\n`
       }
       if (field.min !== undefined) output += `        minimum: ${field.min},\n`
       if (field.max !== undefined) output += `        maximum: ${field.max},\n`
+      if (field.step !== undefined) output += `        step: ${field.step},\n`
 
       if (field.type === 'color') {
         output += `        format: 'color',\n`
@@ -460,6 +469,12 @@ async function main() {
 
   fs.ensureDirSync(OUTPUT_DIR)
   
+  // Invalidate cache to ensure all schemas are regenerated with new logic
+  if (fs.existsSync(CACHE_FILE)) {
+    console.log('🧹 Invalidating cache to apply new generation logic...\n')
+    fs.removeSync(CACHE_FILE)
+  }
+
   const schemas: Record<string, EffectSchema> = {}
   const originalNames: Record<string, string> = {}
   let processed = 0
