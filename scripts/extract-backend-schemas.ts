@@ -252,7 +252,7 @@ function parsePythonEffect(content: string, effectName: string): EffectSchema {
   // Inject inherited fields from base classes if they are not redefined
   const inheritedFields: SchemaField[] = []
 
-  if (content.includes('GradientEffect')) {
+  if (content.includes('GradientEffect') || effectName === 'radial') {
     inheritedFields.push(
       {
         id: 'gradient',

@@ -136,6 +136,9 @@ export const spectrumFragmentShader = `
   uniform vec3 u_primaryColor;
   uniform vec3 u_secondaryColor;
   uniform float u_time;
+  uniform sampler2D u_gradient;
+  uniform bool u_useGradient;
+  uniform float u_gradientRoll;
 
   varying float v_amplitude;
   varying float v_index;

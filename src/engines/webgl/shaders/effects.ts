@@ -840,6 +840,9 @@ export const flameShader = `
   uniform vec3 u_lowColor;
   uniform vec3 u_midColor;
   uniform vec3 u_highColor;
+  uniform sampler2D u_gradient;
+  uniform bool u_useGradient;
+  uniform float u_gradientRoll;
 
   varying vec2 v_position;
 
