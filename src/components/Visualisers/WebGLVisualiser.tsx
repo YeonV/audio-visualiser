@@ -136,9 +136,9 @@ export const WebGLVisualiser = ({
   // Update audio data ref in render (no useEffect needed)
   audioDataRef.current = audioData
 
-  // Extract common config with defaults
-  const sensitivity = config.sensitivity ?? 1.0
-  const smoothing = config.smoothing ?? 0.5
+  // Extract common config with defaults, handling both frontend and backend naming conventions
+  const sensitivity = config.audioSensitivity ?? config.sensitivity ?? config.multiplier ?? 1.0
+  const smoothing = config.audioSmoothing ?? config.smoothing ?? 0.5
 
   // Initialize WebGL
   const initWebGL = useCallback(() => {
@@ -396,10 +396,12 @@ export const WebGLVisualiser = ({
 
       const primaryColorLoc = gl.getUniformLocation(program, 'u_primaryColor')
       const secondaryColorLoc = gl.getUniformLocation(program, 'u_secondaryColor')
-      const [r1, g1, b1] = themeColorsRef.current.primary
-      const [r2, g2, b2] = themeColorsRef.current.secondary
-      gl.uniform3f(primaryColorLoc, r1, g1, b1)
-      gl.uniform3f(secondaryColorLoc, r2, g2, b2)
+
+      const primaryColor = config.primaryColor ? hexToRgb(config.primaryColor) : themeColorsRef.current.primary
+      const secondaryColor = config.secondaryColor ? hexToRgb(config.secondaryColor) : themeColorsRef.current.secondary
+
+      gl.uniform3f(primaryColorLoc, primaryColor[0], primaryColor[1], primaryColor[2])
+      gl.uniform3f(secondaryColorLoc, secondaryColor[0], secondaryColor[1], secondaryColor[2])
 
       // Draw
       gl.drawArrays(gl.TRIANGLES, 0, vertices.length / 2)
@@ -539,10 +541,12 @@ export const WebGLVisualiser = ({
 
       const primaryColorLoc = gl.getUniformLocation(program, 'u_primaryColor')
       const secondaryColorLoc = gl.getUniformLocation(program, 'u_secondaryColor')
-      const [r1, g1, b1] = themeColorsRef.current.primary
-      const [r2, g2, b2] = themeColorsRef.current.secondary
-      gl.uniform3f(primaryColorLoc, r1, g1, b1)
-      gl.uniform3f(secondaryColorLoc, r2, g2, b2)
+
+      const primaryColor = config.primaryColor ? hexToRgb(config.primaryColor) : themeColorsRef.current.primary
+      const secondaryColor = config.secondaryColor ? hexToRgb(config.secondaryColor) : themeColorsRef.current.secondary
+
+      gl.uniform3f(primaryColorLoc, primaryColor[0], primaryColor[1], primaryColor[2])
+      gl.uniform3f(secondaryColorLoc, secondaryColor[0], secondaryColor[1], secondaryColor[2])
 
       // Draw points
       gl.drawArrays(gl.POINTS, 0, particlesRef.current.length)
@@ -734,10 +738,12 @@ export const WebGLVisualiser = ({
 
       const primaryColorLoc = gl.getUniformLocation(program, 'u_primaryColor')
       const secondaryColorLoc = gl.getUniformLocation(program, 'u_secondaryColor')
-      const [r1, g1, b1] = themeColorsRef.current.primary
-      const [r2, g2, b2] = themeColorsRef.current.secondary
-      gl.uniform3f(primaryColorLoc, r1, g1, b1)
-      gl.uniform3f(secondaryColorLoc, r2, g2, b2)
+
+      const primaryColor = config.primaryColor ? hexToRgb(config.primaryColor) : themeColorsRef.current.primary
+      const secondaryColor = config.secondaryColor ? hexToRgb(config.secondaryColor) : themeColorsRef.current.secondary
+
+      gl.uniform3f(primaryColorLoc, primaryColor[0], primaryColor[1], primaryColor[2])
+      gl.uniform3f(secondaryColorLoc, secondaryColor[0], secondaryColor[1], secondaryColor[2])
 
       // Draw
       gl.drawArrays(gl.TRIANGLES, 0, vertices.length / 2)
@@ -924,7 +930,10 @@ export const WebGLVisualiser = ({
       if (resolutionLoc) gl.uniform2f(resolutionLoc, width, height)
 
       const timeLoc = gl.getUniformLocation(program, 'u_time')
-      if (timeLoc) gl.uniform1f(timeLoc, ((Date.now() - startTimeRef.current) / 1000) * speed)
+      if (timeLoc) {
+        const actualSpeed = config.speed ?? speed
+        gl.uniform1f(timeLoc, ((Date.now() - startTimeRef.current) / 1000) * actualSpeed)
+      }
 
       const energyLoc = gl.getUniformLocation(program, 'u_energy')
       if (energyLoc) gl.uniform1f(energyLoc, avg * sensitivity)
@@ -948,10 +957,12 @@ export const WebGLVisualiser = ({
 
       const primaryColorLoc = gl.getUniformLocation(program, 'u_primaryColor')
       const secondaryColorLoc = gl.getUniformLocation(program, 'u_secondaryColor')
-      const [r1, g1, b1] = themeColorsRef.current.primary
-      const [r2, g2, b2] = themeColorsRef.current.secondary
-      gl.uniform3f(primaryColorLoc, r1, g1, b1)
-      gl.uniform3f(secondaryColorLoc, r2, g2, b2)
+
+      const primaryColor = config.primaryColor ? hexToRgb(config.primaryColor) : themeColorsRef.current.primary
+      const secondaryColor = config.secondaryColor ? hexToRgb(config.secondaryColor) : themeColorsRef.current.secondary
+
+      gl.uniform3f(primaryColorLoc, primaryColor[0], primaryColor[1], primaryColor[2])
+      gl.uniform3f(secondaryColorLoc, secondaryColor[0], secondaryColor[1], secondaryColor[2])
 
       // Frequency band uniforms (for new Matrix effects)
       const currentFreqBands = frequencyBandsRef.current
@@ -1122,7 +1133,7 @@ export const WebGLVisualiser = ({
       // Image effect uniforms
       const bgColorLoc = gl.getUniformLocation(program, 'u_bgColor')
       if (bgColorLoc) {
-        const bgColor = hexToRgb(config.bg_color ?? '#000000')
+        const bgColor = hexToRgb(config.bg_color ?? config.backgroundColor ?? '#000000')
         gl.uniform3f(bgColorLoc, ...bgColor)
       }
 

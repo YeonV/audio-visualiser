@@ -46,6 +46,7 @@ const FRONTEND_ONLY_SHADERS = [
   'matrix',
   'terrain',
   'geometric',
+  'image',
 ]
 
 interface SchemaField {
