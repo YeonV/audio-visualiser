@@ -421,11 +421,11 @@ export const matrixRainShader = `
     // Color
     vec3 color;
     if (u_useGradient) {
-      // Index gradient by brightness (head to tail) mixed with column randomness
-      float gradIdx = fract(brightness * 0.8 + colRand * 0.2 + u_gradientRoll);
+      // Use brightness and y position to index gradient
+      float gradIdx = fract(brightness * 0.5 + uv.y * 0.2 + u_gradientRoll);
       color = texture2D(u_gradient, vec2(gradIdx, 0.5)).rgb * (char + trail);
 
-      // Add a bright head
+      // Bright head
       color = mix(color, vec3(1.0), pow(brightness, 10.0));
     } else {
       color = u_primaryColor * (char + trail);
@@ -487,12 +487,9 @@ export const terrainShader = `
     // Sun/horizon glow
     float sun = exp(-length(uv - vec2(0.0, 0.8)) * 3.0);
 
-    // Color
-    vec3 color = vec3(0.0);
-
     // Sky gradient
     float skyGrad = smoothstep(-0.2, 0.8, uv.y);
-    color = mix(u_secondaryColor * 0.3, vec3(0.0), skyGrad);
+    vec3 color = mix(u_secondaryColor * 0.3, vec3(0.0), skyGrad);
 
     // Sun
     color += u_primaryColor * sun * 2.0;
@@ -582,9 +579,7 @@ export const geometricShader = `
         // Sample gradient based on layer index and roll
         float gradIdx = fract(i / 5.0 + u_gradientRoll);
         layerColor = texture2D(u_gradient, vec2(gradIdx, 0.5)).rgb;
-
-        // Ensure some minimum visibility
-        layerColor = mix(layerColor, vec3(0.5), 0.1);
+        layerColor += 0.05; // Ensure some base visibility
       } else {
         layerColor = mix(u_primaryColor, u_secondaryColor, i / 5.0);
       }
@@ -900,7 +895,8 @@ export const flameShader = `
     vec2 uv3 = uv;
     uv3.x += snoise(vec2(uv.y * 5.0, time * 4.0)) * u_wobble * u_high;
     float flameHigh = 1.0 - (abs(uv3.x) / (flameWidth * 0.5));
-    flameHigh *= 1.0 - (distY / (flameHeight * 0.6));
+    float flameHighY = distY / (flameHeight * 0.6);
+    flameHigh *= 1.0 - flameHighY;
     flameHigh += fbm(turbUV * 2.0 + 2.0) * 0.5;
     flameHigh = smoothstep(0.0, 1.0, flameHigh) * u_high;
 

@@ -128,13 +128,11 @@ export const WebGLVisualiser = ({
     postProcessingRef.current = postProcessing
     postProcessingEnabledRef.current = postProcessingEnabled
     onContextCreatedRef.current = onContextCreated
-  }, [postProcessing, postProcessingEnabled, onContextCreated])
-
-  // Update audio and config refs every render
-  beatDataRef.current = beatData
-  frequencyBandsRef.current = frequencyBands
-  configRef.current = config
-  audioDataRef.current = audioData
+    beatDataRef.current = beatData
+    frequencyBandsRef.current = frequencyBands
+    configRef.current = config
+    audioDataRef.current = audioData
+  })
 
   // Update theme colors
   useEffect(() => {
@@ -144,20 +142,20 @@ export const WebGLVisualiser = ({
     }
   }, [theme?.palette?.primary?.main, theme?.palette?.secondary?.main])
 
-  const getLoc = (name: string) => {
+  const getLoc = useCallback((name: string) => {
     if (locationsRef.current[name] !== undefined) return locationsRef.current[name]
     if (!glRef.current || !programRef.current) return null
     const loc = glRef.current.getUniformLocation(programRef.current, name)
     locationsRef.current[name] = loc
     return loc
-  }
+  }, [])
 
   // Initialize WebGL
   const initWebGL = useCallback(() => {
     const canvas = canvasRef.current
     if (!canvas) return false
 
-    const gl = canvas.getContext('webgl', {
+    const gl = glRef.current || canvas.getContext('webgl', {
       alpha: true,
       antialias: true,
       premultipliedAlpha: false
@@ -281,7 +279,7 @@ export const WebGLVisualiser = ({
     }
 
     return true
-  }, [visualType, customShader])
+  }, [visualType, customShader, getLoc])
 
   // Apply smoothing
   const getSmoothData = useCallback(
@@ -378,7 +376,7 @@ export const WebGLVisualiser = ({
       if (indexLoc !== -1) gl.disableVertexAttribArray(indexLoc)
       gl.deleteBuffer(positionBuffer); gl.deleteBuffer(amplitudeBuffer); gl.deleteBuffer(indexBuffer)
     },
-    []
+    [getLoc]
   )
 
   // Draw particles
@@ -448,7 +446,7 @@ export const WebGLVisualiser = ({
       gl.disableVertexAttribArray(posLoc); if (velLoc !== -1) gl.disableVertexAttribArray(velLoc); if (lifeLoc !== -1) gl.disableVertexAttribArray(lifeLoc); if (sizeLoc !== -1) gl.disableVertexAttribArray(sizeLoc); if (ampLoc !== -1) gl.disableVertexAttribArray(ampLoc)
       gl.deleteBuffer(posBuf); gl.deleteBuffer(velBuf); gl.deleteBuffer(lifeBuf); gl.deleteBuffer(sizeBuf); gl.deleteBuffer(ampBuf)
     },
-    []
+    [getLoc]
   )
 
   // Draw radial visualization
@@ -488,9 +486,9 @@ export const WebGLVisualiser = ({
 
       gl.drawArrays(gl.TRIANGLES, 0, vertices.length / 2)
       gl.disableVertexAttribArray(posLoc); if (ampLoc !== -1) gl.disableVertexAttribArray(ampLoc); if (idxLoc !== -1) gl.disableVertexAttribArray(idxLoc)
-      gl.deleteBuffer(posBuf); gl.deleteBuffer(ampBuf); gl.deleteBuffer(idxBuf)
+      gl.deleteBuffer(posBuf); gl.deleteBuffer(ampBuf); gl.deleteTexture(idxBuf)
     },
-    []
+    [getLoc]
   )
 
   // Draw waveform with 3D effect
@@ -531,7 +529,7 @@ export const WebGLVisualiser = ({
       gl.disableVertexAttribArray(posLoc); if (ampLoc !== -1) gl.disableVertexAttribArray(ampLoc); if (idxLoc !== -1) gl.disableVertexAttribArray(idxLoc)
       gl.deleteBuffer(posBuf); gl.deleteBuffer(ampBuf); gl.deleteBuffer(idxBuf)
     },
-    []
+    [getLoc]
   )
 
   // Draw Bleep
@@ -569,7 +567,7 @@ export const WebGLVisualiser = ({
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
       gl.disableVertexAttribArray(posLoc); gl.deleteBuffer(posBuf)
     },
-    []
+    [getLoc]
   )
 
   // Draw Concentric
@@ -602,7 +600,7 @@ export const WebGLVisualiser = ({
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
       gl.disableVertexAttribArray(posLoc); gl.deleteBuffer(posBuf)
     },
-    []
+    [getLoc]
   )
 
   // Draw Custom / GIF / Matrix Effects
@@ -685,7 +683,10 @@ export const WebGLVisualiser = ({
       const gradLoc = getLoc('u_gradient')
       const gradRollLoc = getLoc('u_gradientRoll')
       if (gradLoc && cfg.gradient) {
-        if (!gradientTextureRef.current) gradientTextureRef.current = gl.createTexture()
+        if (!gradientTextureRef.current) {
+          gradientTextureRef.current = gl.createTexture()
+          currentGradientStrRef.current = null // Force upload
+        }
         if (currentGradientStrRef.current !== cfg.gradient) {
           const gradData = parseGradient(cfg.gradient); gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, gradientTextureRef.current)
           gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 256, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, gradData)
@@ -738,7 +739,7 @@ export const WebGLVisualiser = ({
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
       gl.disableVertexAttribArray(posLoc); gl.deleteBuffer(posBuf)
     },
-    [visualType, getLoc]
+    [getLoc, visualType]
   )
 
   // Main draw function
@@ -807,6 +808,12 @@ export const WebGLVisualiser = ({
     return () => {
       isDrawingRef.current = false
       if (animationRef.current) { cancelAnimationFrame(animationRef.current); animationRef.current = undefined }
+    }
+  }, [isPlaying, initWebGL, draw])
+
+  // Cleanup on unmount or visual type change
+  useEffect(() => {
+    return () => {
       if (glRef.current) {
         if (gradientTextureRef.current) glRef.current.deleteTexture(gradientTextureRef.current)
         if (melbankTextureRef.current) glRef.current.deleteTexture(melbankTextureRef.current)
@@ -814,9 +821,10 @@ export const WebGLVisualiser = ({
         gradientTextureRef.current = null
         melbankTextureRef.current = null
         historyTextureRef.current = null
+        currentGradientStrRef.current = null
       }
     }
-  }, [isPlaying, initWebGL, draw])
+  }, [visualType])
 
   // Resize handler
   useEffect(() => {

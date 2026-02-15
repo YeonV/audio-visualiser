@@ -32,7 +32,8 @@ export function parseGradient(gradientStr: string, size: number = 256): Uint8Arr
   if (!ctx) return createFallback()
 
   try {
-    const cleanStr = gradientStr.trim().replace(/;$/, '')
+    // Basic cleanup: remove semicolon, trim
+    const cleanStr = gradientStr.trim().replace(/;+$/, '').trim()
 
     if (cleanStr.includes('linear-gradient')) {
       const stops = parseColorStops(cleanStr)
@@ -51,9 +52,11 @@ export function parseGradient(gradientStr: string, size: number = 256): Uint8Arr
       } else {
         ctx.fillStyle = '#f0f' // Magenta for "missing"
       }
+    } else if (cleanStr) {
+      // Solid color or other CSS color format
+      ctx.fillStyle = cleanStr
     } else {
-      // Solid color
-      ctx.fillStyle = cleanStr || '#000'
+      ctx.fillStyle = '#000'
     }
 
     ctx.clearRect(0, 0, size, 1)
@@ -87,9 +90,16 @@ function parseColorStops(gradientStr: string): ColorStop[] {
 
   let startIndex = 0
   if (parts.length > 0) {
-    const firstPart = parts[0].trim()
+    const firstPart = parts[0].trim().toLowerCase()
     // Skip orientation/angle
-    if (firstPart.includes('deg') || firstPart.startsWith('to ') || /^\d+$/.test(firstPart)) {
+    // Handles: "90deg", "to right", "0.25turn", "1.5rad", or pure numbers
+    if (
+      firstPart.includes('deg') ||
+      firstPart.includes('turn') ||
+      firstPart.includes('rad') ||
+      firstPart.startsWith('to ') ||
+      /^-?[\d.]+$/.test(firstPart)
+    ) {
       startIndex = 1
     }
   }
@@ -98,41 +108,66 @@ function parseColorStops(gradientStr: string): ColorStop[] {
     const part = parts[i].trim()
     if (!part) continue
 
-    // Match color and optional position (percentage or decimal)
-    // Matches: "rgb(0,0,0) 10%", "#fff 0.5", "red", "rgba(0,0,0,0) 100%"
-    const match = part.match(/^(.*?)(\s+[\d.]+%?)?$/)
-    if (match) {
-      const color = match[1].trim()
-      let posStr = match[2] ? match[2].trim() : null
+    // Match color and optional position
+    // We look for the last space that isn't inside parentheses
+    const spaceIdx = lastIndexOfIgnoringParentheses(part, ' ')
 
-      let pos: number
-      if (posStr) {
-        if (posStr.endsWith('%')) {
-          pos = parseFloat(posStr) / 100
-        } else {
-          pos = parseFloat(posStr)
-        }
+    let color: string
+    let pos: number | null = null
+
+    if (spaceIdx !== -1) {
+      const maybeColor = part.substring(0, spaceIdx).trim()
+      const maybePos = part.substring(spaceIdx + 1).trim()
+
+      if (maybePos.endsWith('%') || /^-?[\d.]+$/.test(maybePos)) {
+        color = maybeColor
+        pos = maybePos.endsWith('%') ? parseFloat(maybePos) / 100 : parseFloat(maybePos)
       } else {
-        const count = parts.length - startIndex
-        const idx = i - startIndex
-        pos = count > 1 ? idx / (count - 1) : 0
+        color = part
       }
+    } else {
+      color = part
+    }
 
+    if (color) {
       stops.push({
         color,
-        pos: Math.max(0, Math.min(1, isNaN(pos) ? 0 : pos))
+        pos: pos !== null ? Math.max(0, Math.min(1, pos)) : -1 // -1 means distribute later
       })
     }
   }
 
-  // Ensure stops are sorted by position
-  stops.sort((a, b) => a.pos - b.pos)
+  // Distribute stops without explicit positions
+  for (let i = 0; i < stops.length; i++) {
+    if (stops[i].pos === -1) {
+      if (i === 0) stops[i].pos = 0
+      else if (i === stops.length - 1) stops[i].pos = 1
+      else {
+        // Find next stop with position
+        let nextWithPos = -1
+        for (let j = i + 1; j < stops.length; j++) {
+          if (stops[j].pos !== -1) {
+            nextWithPos = j
+            break
+          }
+        }
 
-  // Fix cases where multiple stops have same position or are out of order
-  if (stops.length > 0) {
-    if (stops[0].pos > 0) stops.unshift({ color: stops[0].color, pos: 0 })
-    if (stops[stops.length - 1].pos < 1) stops.push({ color: stops[stops.length - 1].color, pos: 1 })
+        const prevPos = stops[i - 1].pos
+        if (nextWithPos !== -1) {
+          const nextPos = stops[nextWithPos].pos
+          const count = nextWithPos - (i - 1)
+          stops[i].pos = prevPos + (nextPos - prevPos) / count
+        } else {
+          // No more stops with positions, space out until the end
+          const count = stops.length - i
+          stops[i].pos = prevPos + (1 - prevPos) / count
+        }
+      }
+    }
   }
+
+  // Final sort just in case
+  stops.sort((a, b) => a.pos - b.pos)
 
   return stops
 }
@@ -148,12 +183,24 @@ function splitIgnoringParentheses(str: string): string[] {
     else if (char === ')') depth--
 
     if (char === ',' && depth === 0) {
-      parts.push(current)
+      parts.push(current.trim())
       current = ''
     } else {
       current += char
     }
   }
-  parts.push(current)
+  if (current.trim()) parts.push(current.trim())
   return parts
+}
+
+function lastIndexOfIgnoringParentheses(str: string, char: string): number {
+  let depth = 0
+  for (let i = str.length - 1; i >= 0; i--) {
+    const c = str[i]
+    if (c === ')') depth++
+    else if (c === '(') depth--
+
+    if (c === char && depth === 0) return i
+  }
+  return -1
 }
