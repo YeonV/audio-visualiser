@@ -36,6 +36,17 @@ export const matrixSchema: VisualizerSchema = {
       minimum: 0.1,
       maximum: 5.0,
       ui: { order: 5, section: 'Visual' }
+    }),
+    gradient: colorProp('Gradient', 'linear-gradient(90deg, rgb(0, 255, 65) 0%, rgb(0, 59, 0) 100%)', {
+      description: 'Optional gradient override',
+      isGradient: true,
+      ui: { order: 6, section: 'Colors' }
+    }),
+    gradient_roll: numberProp('Gradient Roll', 0, {
+      description: 'Speed of gradient animation',
+      minimum: 0,
+      maximum: 10,
+      ui: { order: 7, section: 'Colors' }
     })
   },
   required: ['primaryColor', 'secondaryColor', 'audioSensitivity', 'audioSmoothing', 'brightness', 'speed'],

@@ -38,6 +38,7 @@ import {
   imageShader
 } from '../../engines/webgl/shaders'
 import type { WebGLVisualiserId } from '../../_generated/webgl'
+import { parseGradient } from '../../utils/gradient'
 
 export type WebGLVisualisationType = WebGLVisualiserId
 
@@ -98,6 +99,8 @@ export const WebGLVisualiser = ({
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const glRef = useRef<WebGLRenderingContext | null>(null)
   const programRef = useRef<WebGLProgram | null>(null)
+  const gradientTextureRef = useRef<WebGLTexture | null>(null)
+  const currentGradientStrRef = useRef<string | null>(null)
   const animationRef = useRef<number | undefined>(undefined)
   const startTimeRef = useRef<number>(Date.now())
   const previousDataRef = useRef<number[] | Float32Array>([])
@@ -1052,6 +1055,43 @@ export const WebGLVisualiser = ({
         gl.uniform1f(spinLoc, beatRef.current)
       }
 
+      // Gradient support
+      const useGradientLoc = gl.getUniformLocation(program, 'u_useGradient')
+      const gradientLoc = gl.getUniformLocation(program, 'u_gradient')
+      const gradientRollLoc = gl.getUniformLocation(program, 'u_gradientRoll')
+
+      if (useGradientLoc && gradientLoc && config.gradient) {
+        // Initialize or update gradient texture if needed
+        if (!gradientTextureRef.current) {
+          gradientTextureRef.current = gl.createTexture()
+        }
+
+        if (currentGradientStrRef.current !== config.gradient) {
+          const gradientData = parseGradient(config.gradient)
+          gl.activeTexture(gl.TEXTURE1)
+          gl.bindTexture(gl.TEXTURE_2D, gradientTextureRef.current)
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 256, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, gradientData)
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+          currentGradientStrRef.current = config.gradient
+        }
+
+        gl.activeTexture(gl.TEXTURE1)
+        gl.bindTexture(gl.TEXTURE_2D, gradientTextureRef.current)
+        gl.uniform1i(gradientLoc, 1)
+        gl.uniform1i(useGradientLoc, 1)
+
+        if (gradientRollLoc) {
+          const rollSpeed = config.gradient_roll ?? 0
+          const time = (Date.now() - startTimeRef.current) / 1000
+          gl.uniform1f(gradientRollLoc, (time * rollSpeed) % 1.0)
+        }
+      } else if (useGradientLoc) {
+        gl.uniform1i(useGradientLoc, 0)
+      }
+
       // Create and bind melbank texture for equalizer
       const melBankLoc = gl.getUniformLocation(program, 'u_melbank')
       if (melBankLoc && data.length > 0) {
@@ -1362,6 +1402,11 @@ export const WebGLVisualiser = ({
       particlesRef.current = []
       historyRef.current = new Array(128).fill(0)
       previousDataRef.current = []
+
+      if (glRef.current && gradientTextureRef.current) {
+        glRef.current.deleteTexture(gradientTextureRef.current)
+        gradientTextureRef.current = null
+      }
     }
   }, [isPlaying, initWebGL, draw])
 
