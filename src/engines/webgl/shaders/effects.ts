@@ -1703,7 +1703,8 @@ export const texterShader = `
   uniform float u_high;
   uniform float u_beat;
   uniform vec2 u_resolution;
-  uniform float u_density;
+  uniform float u_heightPercent;
+  uniform float u_widthPercent;
   uniform float u_speed;
 
   uniform sampler2D u_textTexture;
