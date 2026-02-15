@@ -123,12 +123,6 @@ export const particleFragmentShader = `
 export const spectrumFragmentShader = `
   precision mediump float;
 
-  uniform sampler2D u_gradient;
-  uniform bool u_useGradient;
-  uniform float u_gradientRoll;
-  uniform vec3 u_primaryColor;
-  uniform vec3 u_secondaryColor;
-
   varying float v_amplitude;
   varying float v_index;
 
@@ -138,14 +132,8 @@ export const spectrumFragmentShader = `
   }
 
   void main() {
-    vec3 color;
-    if (u_useGradient) {
-      color = texture2D(u_gradient, vec2(fract(v_index + u_gradientRoll), 0.5)).rgb;
-    } else {
-      float hue = v_index;
-      color = hsl2rgb(vec3(hue, 1.0, 0.5));
-      color = mix(color, u_primaryColor, 0.3);
-    }
+    float hue = v_index;
+    vec3 color = hsl2rgb(vec3(hue, 1.0, 0.5));
 
     // Add glow
     color += v_amplitude * 0.3;
@@ -219,9 +207,6 @@ export const bleepFragmentShader = `
   uniform vec3 u_secondaryColor;
   uniform sampler2D u_history; // 1D texture containing amplitude history
   uniform float u_time;
-  uniform sampler2D u_gradient;
-  uniform bool u_useGradient;
-  uniform float u_gradientRoll;
 
   varying vec2 v_position; // -1 to 1
 
@@ -247,12 +232,7 @@ export const bleepFragmentShader = `
     float intensity = smoothstep(thickness, 0.0, dist);
     
     // Color
-    vec3 color;
-    if (u_useGradient) {
-      color = texture2D(u_gradient, vec2(fract(amplitude + u_gradientRoll), 0.5)).rgb;
-    } else {
-      color = mix(u_secondaryColor, u_primaryColor, amplitude);
-    }
+    vec3 color = mix(u_secondaryColor, u_primaryColor, amplitude);
     
     // Add some background grid or effect
     float grid = step(0.95, fract(v_position.x * 10.0)) * 0.1;
@@ -269,9 +249,6 @@ export const concentricFragmentShader = `
   uniform vec3 u_secondaryColor;
   uniform float u_time;
   uniform float u_beat; // Accumulating beat/power value
-  uniform sampler2D u_gradient;
-  uniform bool u_useGradient;
-  uniform float u_gradientRoll;
 
   varying vec2 v_position;
 
@@ -286,12 +263,7 @@ export const concentricFragmentShader = `
     float ring = smoothstep(0.0, 0.1, val) - smoothstep(0.4, 0.5, val);
     
     // Color gradient based on distance
-    vec3 color;
-    if (u_useGradient) {
-      color = texture2D(u_gradient, vec2(fract(dist * 0.5 + 0.5 + u_gradientRoll), 0.5)).rgb;
-    } else {
-      color = mix(u_primaryColor, u_secondaryColor, dist * 0.5 + 0.5);
-    }
+    vec3 color = mix(u_primaryColor, u_secondaryColor, dist * 0.5 + 0.5);
     
     // Modulate brightness
     color *= (ring * 0.8 + 0.2);
@@ -407,9 +379,6 @@ export const matrixRainShader = `
   uniform float u_time;
   uniform float u_energy;
   uniform vec2 u_resolution;
-  uniform sampler2D u_gradient;
-  uniform bool u_useGradient;
-  uniform float u_gradientRoll;
 
   varying vec2 v_position;
 
@@ -447,18 +416,8 @@ export const matrixRainShader = `
     float trail = smoothstep(0.0, 0.5, brightness) * 0.5;
 
     // Color
-    vec3 color;
-    if (u_useGradient) {
-      // Use brightness and y position to index gradient
-      float gradIdx = fract(brightness * 0.5 + uv.y * 0.2 + u_gradientRoll);
-      color = texture2D(u_gradient, vec2(gradIdx, 0.5)).rgb * (char + trail);
-
-      // Bright head
-      color = mix(color, vec3(1.0), pow(brightness, 10.0));
-    } else {
-      color = u_primaryColor * (char + trail);
-      color += u_secondaryColor * brightness * 0.2;
-    }
+    vec3 color = u_primaryColor * (char + trail);
+    color += u_secondaryColor * brightness * 0.2;
 
     // Energy boost
     color *= 0.7 + energy * 1.5;
@@ -479,11 +438,14 @@ export const terrainShader = `
   uniform float u_time;
   uniform float u_energy;
   uniform float u_beat;
-  uniform sampler2D u_gradient;
-  uniform bool u_useGradient;
-  uniform float u_gradientRoll;
 
   varying vec2 v_position;
+
+  vec3 hsv2rgb(vec3 c) {
+    vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+    vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+    return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+  }
 
   void main() {
     vec2 uv = v_position;
@@ -515,27 +477,21 @@ export const terrainShader = `
     // Sun/horizon glow
     float sun = exp(-length(uv - vec2(0.0, 0.8)) * 3.0);
 
+    // Color
+    vec3 color = vec3(0.0);
+
     // Sky gradient
     float skyGrad = smoothstep(-0.2, 0.8, uv.y);
-    vec3 color = mix(u_secondaryColor * 0.3, vec3(0.0), skyGrad);
+    color = mix(u_secondaryColor * 0.3, vec3(0.0), skyGrad);
 
     // Sun
     color += u_primaryColor * sun * 2.0;
 
     // Grid
-    vec3 gridColor = u_primaryColor;
-    if (u_useGradient) {
-      gridColor = texture2D(u_gradient, vec2(fract(groundUV.y * 0.1 + u_gradientRoll), 0.5)).rgb;
-    }
-    color += gridColor * grid * perspective;
+    color += u_primaryColor * grid * perspective;
 
     // Terrain line
-    if (u_useGradient) {
-      // Use x position for terrain line gradient
-      color += texture2D(u_gradient, vec2(fract(uv.x * 0.5 + 0.5 + u_gradientRoll), 0.5)).rgb * line * 2.0 * (1.0 + energy);
-    } else {
-      color += u_primaryColor * line * 2.0 * (1.0 + energy);
-    }
+    color += u_primaryColor * line * 2.0 * (1.0 + energy);
 
     // Scanlines
     color *= 0.9 + 0.1 * sin(uv.y * 200.0);
@@ -553,9 +509,6 @@ export const geometricShader = `
   uniform float u_time;
   uniform float u_energy;
   uniform float u_beat;
-  uniform sampler2D u_gradient;
-  uniform bool u_useGradient;
-  uniform float u_gradientRoll;
 
   varying vec2 v_position;
 
@@ -602,25 +555,13 @@ export const geometricShader = `
       float fill = smoothstep(0.0, -0.1, shape) * 0.1;
 
       // Color per layer
-      vec3 layerColor;
-      if (u_useGradient) {
-        // Sample gradient based on layer index and roll
-        float gradIdx = fract(i / 5.0 + u_gradientRoll);
-        layerColor = texture2D(u_gradient, vec2(gradIdx, 0.5)).rgb;
-        layerColor += 0.05; // Ensure some base visibility
-      } else {
-        layerColor = mix(u_primaryColor, u_secondaryColor, i / 5.0);
-      }
+      vec3 layerColor = mix(u_primaryColor, u_secondaryColor, i / 5.0);
       color += layerColor * (edge + fill) * (1.0 - i * 0.15);
     }
 
     // Center glow
     float centerGlow = exp(-length(uv) * 3.0) * energy;
-    vec3 glowColor = u_primaryColor;
-    if (u_useGradient) {
-      glowColor = texture2D(u_gradient, vec2(u_gradientRoll, 0.5)).rgb;
-    }
-    color += glowColor * centerGlow;
+    color += u_primaryColor * centerGlow;
 
     // Energy boost
     color *= 0.8 + energy * 0.8;
@@ -733,9 +674,6 @@ export const digitalRainShader = `
   uniform float u_speed;
   uniform float u_tailLength;
   uniform float u_glowIntensity;
-  uniform sampler2D u_gradient;
-  uniform bool u_useGradient;
-  uniform float u_gradientRoll;
 
   varying vec2 v_position;
 
@@ -803,17 +741,17 @@ export const digitalRainShader = `
     // Combine
     float brightness = (tailFade * charBright * 0.8 + headGlow);
 
-    // Color - use gradient if available
-    vec3 baseColor = u_useGradient ? texture2D(u_gradient, vec2(fract(tailFade + u_gradientRoll), 0.5)).rgb : u_primaryColor;
+    // Color - green with white head
+    vec3 greenColor = u_primaryColor;
     vec3 whiteColor = vec3(1.0);
-    vec3 color = mix(baseColor, whiteColor, headGlow);
+    vec3 color = mix(greenColor, whiteColor, headGlow);
     color *= brightness;
 
     // Add subtle column variation
     color *= 0.8 + 0.2 * random(vec2(colIdx, 1.0));
 
     // Beat pulse - flash all active characters
-    color += u_primaryColor * u_beat * tailFade * 0.3;
+    color += greenColor * u_beat * tailFade * 0.3;
 
     // Scanline effect
     float scanline = sin(uv.y * u_resolution.y * 2.0) * 0.1 + 0.9;
@@ -840,9 +778,6 @@ export const flameShader = `
   uniform vec3 u_lowColor;
   uniform vec3 u_midColor;
   uniform vec3 u_highColor;
-  uniform sampler2D u_gradient;
-  uniform bool u_useGradient;
-  uniform float u_gradientRoll;
 
   varying vec2 v_position;
 
@@ -926,26 +861,15 @@ export const flameShader = `
     vec2 uv3 = uv;
     uv3.x += snoise(vec2(uv.y * 5.0, time * 4.0)) * u_wobble * u_high;
     float flameHigh = 1.0 - (abs(uv3.x) / (flameWidth * 0.5));
-    float flameHighY = distY / (flameHeight * 0.6);
-    flameHigh *= 1.0 - flameHighY;
+    flameHigh *= 1.0 - (distY / (flameHeight * 0.6));
     flameHigh += fbm(turbUV * 2.0 + 2.0) * 0.5;
     flameHigh = smoothstep(0.0, 1.0, flameHigh) * u_high;
 
     // Combine colors
     vec3 color = vec3(0.0);
-    vec3 lowColor = u_lowColor;
-    vec3 midColor = u_midColor;
-    vec3 highColor = u_highColor;
-
-    if (u_useGradient) {
-      lowColor = texture2D(u_gradient, vec2(fract(0.0 + u_gradientRoll), 0.5)).rgb;
-      midColor = texture2D(u_gradient, vec2(fract(0.5 + u_gradientRoll), 0.5)).rgb;
-      highColor = texture2D(u_gradient, vec2(fract(1.0 + u_gradientRoll), 0.5)).rgb;
-    }
-
-    color += lowColor * flame * (0.5 + u_bass);
-    color += midColor * flameMid;
-    color += highColor * flameHigh;
+    color += u_lowColor * flame * (0.5 + u_bass);
+    color += u_midColor * flameMid;
+    color += u_highColor * flameHigh;
 
     // Inner glow (hottest part)
     float inner = flame * flameMid * flameHigh;
@@ -1051,9 +975,6 @@ export const equalizer2dShader = `
   uniform float u_ringMode;
   uniform float u_centerMode;
   uniform float u_spin;
-  uniform sampler2D u_gradient;
-  uniform bool u_useGradient;
-  uniform float u_gradientRoll;
 
   varying vec2 v_position;
 
@@ -1095,7 +1016,7 @@ export const equalizer2dShader = `
 
       // Color by frequency
       float hue = bandIdx / bands;
-      vec3 barColor = u_useGradient ? texture2D(u_gradient, vec2(fract(hue + u_gradientRoll), 0.5)).rgb : hsv2rgb(vec3(hue, 0.8, 1.0));
+      vec3 barColor = hsv2rgb(vec3(hue, 0.8, 1.0));
 
       color = barColor * inBar * edgeFade;
 
@@ -1136,7 +1057,7 @@ export const equalizer2dShader = `
 
         // Color by frequency
         float hue = barIdx / bands * 0.8;
-        vec3 barColor = u_useGradient ? texture2D(u_gradient, vec2(fract(hue + u_gradientRoll), 0.5)).rgb : hsv2rgb(vec3(hue, 0.9, 1.0));
+        vec3 barColor = hsv2rgb(vec3(hue, 0.9, 1.0));
 
         color = barColor * inBar * edgeFade;
 
@@ -1438,9 +1359,6 @@ export const bandsShader = `
   uniform sampler2D u_melbank;
   uniform float u_bands;
   uniform float u_flip;
-  uniform sampler2D u_gradient;
-  uniform bool u_useGradient;
-  uniform float u_gradientRoll;
 
   varying vec2 v_position;
 
@@ -1469,8 +1387,8 @@ export const bandsShader = `
     float gap = smoothstep(0.0, 0.1, barX) * smoothstep(1.0, 0.9, barX);
 
     // Color gradient
-    float hue = barIdx / bands;
-    vec3 barColor = u_useGradient ? texture2D(u_gradient, vec2(fract(hue + u_gradientRoll), 0.5)).rgb : hsv2rgb(vec3(hue * 0.7, 0.8, 1.0));
+    float hue = barIdx / bands * 0.7;
+    vec3 barColor = hsv2rgb(vec3(hue, 0.8, 1.0));
 
     vec3 color = barColor * inBar * gap;
 
@@ -1499,9 +1417,6 @@ export const bandsMatrixShader = `
   uniform vec2 u_resolution;
   uniform sampler2D u_melbank;
   uniform float u_bands;
-  uniform sampler2D u_gradient;
-  uniform bool u_useGradient;
-  uniform float u_gradientRoll;
 
   varying vec2 v_position;
 
@@ -1532,8 +1447,8 @@ export const bandsMatrixShader = `
     cell *= smoothstep(0.0, 0.1, cellUV.y) * smoothstep(1.0, 0.9, cellUV.y);
 
     // Color by column
-    float hue = gridPos.x / bands;
-    vec3 cellColor = u_useGradient ? texture2D(u_gradient, vec2(fract(hue + u_gradientRoll), 0.5)).rgb : hsv2rgb(vec3(hue * 0.7, 0.8, 0.9));
+    float hue = gridPos.x / bands * 0.7;
+    vec3 cellColor = hsv2rgb(vec3(hue, 0.8, 0.9));
 
     // Brightness by row
     cellColor *= 0.5 + (gridPos.y / rows) * 0.5;
@@ -1703,8 +1618,6 @@ export const texterShader = `
   uniform float u_high;
   uniform float u_beat;
   uniform vec2 u_resolution;
-  uniform float u_heightPercent;
-  uniform float u_widthPercent;
   uniform float u_speed;
 
   uniform sampler2D u_textTexture;
@@ -1717,6 +1630,9 @@ export const texterShader = `
   uniform sampler2D u_gradient;
   uniform bool u_useGradient;
   uniform float u_gradientRoll;
+
+  uniform float u_widthPercent;
+  uniform float u_heightPercent;
 
   varying vec2 v_position;
 
@@ -1797,7 +1713,6 @@ export const texterShader = `
     }
 
     // Final color modulated by text alpha and audio
-    // Text color is baked into texture usually, but we can override
     vec3 finalColor = mix(vec3(0.0), color, tex.a * alpha);
 
     // Glow effect
@@ -1875,9 +1790,6 @@ export const radialShader = `
   uniform vec2 u_resolution;
   uniform sampler2D u_melbank;
   uniform float u_bands;
-  uniform sampler2D u_gradient;
-  uniform bool u_useGradient;
-  uniform float u_gradientRoll;
 
   varying vec2 v_position;
 
@@ -1913,7 +1825,7 @@ export const radialShader = `
 
     // Color by angle
     float hue = bandIdx / bands;
-    vec3 barColor = u_useGradient ? texture2D(u_gradient, vec2(fract(hue + u_gradientRoll), 0.5)).rgb : hsv2rgb(vec3(hue, 0.9, 1.0));
+    vec3 barColor = hsv2rgb(vec3(hue, 0.9, 1.0));
 
     vec3 color = barColor * inBar * edge;
 
@@ -2014,9 +1926,6 @@ export const waterfallShader = `
   uniform sampler2D u_melbank;
   uniform float u_bands;
   uniform float u_speed;
-  uniform sampler2D u_gradient;
-  uniform bool u_useGradient;
-  uniform float u_gradientRoll;
 
   varying vec2 v_position;
 
@@ -2049,13 +1958,11 @@ export const waterfallShader = `
     float intensity = melVal * (1.0 - scroll) + historyNoise * scroll * 0.3;
 
     // Color by frequency and intensity
-    float hue = bandIdx / bands;
-    vec3 color;
-    if (u_useGradient) {
-      color = texture2D(u_gradient, vec2(fract(hue + u_gradientRoll), 0.5)).rgb * intensity;
-    } else {
-      color = hsv2rgb(vec3(hue * 0.7, 0.8, intensity));
-    }
+    float hue = bandIdx / bands * 0.7;
+    float sat = 0.8;
+    float val = intensity;
+
+    vec3 color = hsv2rgb(vec3(hue, sat, val));
 
     // Add glow for high values
     color += hsv2rgb(vec3(hue, 0.5, 1.0)) * pow(intensity, 3.0) * 0.5;

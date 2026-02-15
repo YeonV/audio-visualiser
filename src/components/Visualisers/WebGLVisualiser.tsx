@@ -738,9 +738,9 @@ export const WebGLVisualiser = ({
         else beatRef.current += avg * sensitivity * 0.1
         gl.uniform1f(beatLoc, beatRef.current)
       }
-      // Rotate: if max is 360, it's degrees, if max is 3, it's 90deg steps
+      // Rotate: 360 degrees to radians
       const rotateValue = cfg.rotate ?? 0
-      const radians = rotateValue <= 4 ? rotateValue * Math.PI / 2 : rotateValue * Math.PI / 180
+      const radians = rotateValue * Math.PI / 180
       gl.uniform1f(getLoc('u_rotate'), radians)
 
       gl.uniform1i(getLoc('u_flipH'), cfg.flip_horizontal ? 1 : 0)

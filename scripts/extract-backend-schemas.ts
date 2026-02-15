@@ -279,7 +279,7 @@ function parsePythonEffect(content: string, effectName: string): EffectSchema {
     inheritedFields.push(
       { id: 'flip_horizontal', title: 'Flip Horizontal', type: 'boolean', default: false, description: 'Flip image horizontally' },
       { id: 'flip_vertical', title: 'Flip Vertical', type: 'boolean', default: false, description: 'Flip image vertically' },
-      { id: 'rotate', title: 'Rotate', type: 'integer', default: 0, min: 0, max: 3, step: 1, description: '90 Degree rotations' },
+      { id: 'rotate', title: 'Rotate', type: 'integer', default: 0, min: 0, max: 360, step: 1, title: 'Rotate (Deg)', description: 'Rotation in degrees' },
       { id: 'background_mode', title: 'Background Mode', type: 'string', default: 'additive', description: 'Background blending mode' }
     )
   }
@@ -437,14 +437,6 @@ export const VISUALISER_SCHEMAS: Record<string, VisualizerSchema> = {\n`
         step: 1
       })
       schema.defaults.width_percent = 100
-
-      // Update rotate to 360
-      const rotateField = schema.fields.find(f => f.id === 'rotate')
-      if (rotateField) {
-        rotateField.max = 360
-        rotateField.step = 1
-        rotateField.title = 'Rotate (Deg)'
-      }
     }
 
     output += `  "${key}": {\n`

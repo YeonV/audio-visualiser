@@ -105,7 +105,8 @@ function generateUISchema(schema: VisualizerSchema): string {
     const isButterchurnPreset = schema.$id === 'butterchurn' && key === 'currentPresetName'
     
     const propObj: any = {
-      type: isButterchurnPreset || (prop as any).enum ? 'autocomplete' :
+      type: isButterchurnPreset ? 'autocomplete' :
+            (prop as any).enum ? 'string' : // Force string for enums to trigger BladeSelect
             prop.type === 'integer' ? 'integer' : 
             (prop as any).format === 'color' ? 'color' : 
             prop.type,
