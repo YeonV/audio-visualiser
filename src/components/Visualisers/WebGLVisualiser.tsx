@@ -486,7 +486,7 @@ export const WebGLVisualiser = ({
 
       gl.drawArrays(gl.TRIANGLES, 0, vertices.length / 2)
       gl.disableVertexAttribArray(posLoc); if (ampLoc !== -1) gl.disableVertexAttribArray(ampLoc); if (idxLoc !== -1) gl.disableVertexAttribArray(idxLoc)
-      gl.deleteBuffer(posBuf); gl.deleteBuffer(ampBuf); gl.deleteTexture(idxBuf)
+      gl.deleteBuffer(posBuf); gl.deleteBuffer(ampBuf); gl.deleteBuffer(idxBuf)
     },
     [getLoc]
   )
