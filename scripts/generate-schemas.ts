@@ -92,7 +92,7 @@ function generateUISchema(schema: VisualizerSchema): string {
     const isButterchurnPreset = schema.$id === 'butterchurn' && key === 'currentPresetName'
     
     const propObj: any = {
-      type: isButterchurnPreset ? 'autocomplete' :
+      type: isButterchurnPreset || (prop as any).enum ? 'autocomplete' :
             prop.type === 'integer' ? 'integer' : 
             (prop as any).format === 'color' ? 'color' : 
             prop.type,
@@ -106,10 +106,12 @@ function generateUISchema(schema: VisualizerSchema): string {
     if ('step' in prop && (prop as any).step !== undefined) propObj.step = (prop as any).step
     if ('isGradient' in prop && prop.isGradient) propObj.isGradient = true
     
-    // Add enum and freeSolo for butterchurn preset
+    // Add enum and freeSolo
     if (isButterchurnPreset) {
       propObj.enum = []
       propObj.freeSolo = true
+    } else if ((prop as any).enum) {
+      propObj.enum = (prop as any).enum
     }
     
     return `    ${key}: ${JSON.stringify(propObj, null, 6).replace(/\n/g, '\n    ')}`

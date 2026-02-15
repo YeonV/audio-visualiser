@@ -367,7 +367,17 @@ function parseValidator(id: string, description: string, defaultValue: string | 
   } else if (validator.includes('vol.In')) {
     // Enum type
     field.type = 'string'
-    // Could extract enum values but complex - leave as string for now
+    // Try to extract enum values
+    const inMatch = validator.match(/vol\.In\s*\(\s*\[([\s\S]*?)\]\s*\)/)
+    if (inMatch) {
+      field.enum = inMatch[1].split(',').map(v => v.trim().replace(/['"]/g, ''))
+    } else if (validator.includes('TEXT_EFFECT_MAPPING')) {
+      field.enum = ["Side Scroll", "Spokes", "Carousel", "Wave", "Pulse", "Fade"]
+    } else if (validator.includes('FONT_MAPPINGS')) {
+      field.enum = ["Press Start 2P", "Arial", "Courier New"]
+    } else if (validator.includes('ResizeMethods')) {
+      field.enum = ["Fastest", "Fast", "Slow"]
+    }
   } else if (validator.includes('vol.Coerce(float)') || validator.includes('vol.Coerce(int)')) {
     // Number type with range
     field.type = validator.includes('vol.Coerce(int)') ? 'integer' : 'number'
@@ -421,6 +431,12 @@ export const VISUALISER_SCHEMAS: Record<string, VisualizerSchema> = {\n`
   for (const [key, schema] of Object.entries(schemas)) {
     const displayName = key.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
 
+    // UI Tweaks for specific effects
+    if (key === 'texter') {
+      schema.hiddenKeys.push('option_1', 'option_2', 'value_option_1', 'resize_method', 'deep_diag', 'background_mode', 'blur')
+      schema.advancedKeys.push('impulse_decay', 'multiplier', 'speed_option_1', 'gradient_roll')
+    }
+
     output += `  "${key}": {\n`
     output += `    $id: '${key}',\n`
     output += `    displayName: '${displayName}',\n`
@@ -442,6 +458,7 @@ export const VISUALISER_SCHEMAS: Record<string, VisualizerSchema> = {\n`
       if (field.min !== undefined) output += `        minimum: ${field.min},\n`
       if (field.max !== undefined) output += `        maximum: ${field.max},\n`
       if (field.step !== undefined) output += `        step: ${field.step},\n`
+      if (field.enum !== undefined) output += `        enum: ${JSON.stringify(field.enum)},\n`
 
       if (field.type === 'color') {
         output += `        format: 'color',\n`

@@ -739,6 +739,8 @@ export const WebGLVisualiser = ({
         gl.uniform1f(beatLoc, beatRef.current)
       }
       gl.uniform1f(getLoc('u_rotate'), rotation)
+      gl.uniform1i(getLoc('u_flipH'), cfg.flip_horizontal ? 1 : 0)
+      gl.uniform1i(getLoc('u_flipV'), cfg.flip_vertical ? 1 : 0)
       gl.uniform1f(getLoc('u_brightness'), brightness)
 
       const primaryColor = cfg.primaryColor ? hexToRgb(cfg.primaryColor) : themeColorsRef.current.primary
@@ -811,6 +813,7 @@ export const WebGLVisualiser = ({
         handleTextTexture(gl, cfg)
         const effectMap: Record<string, number> = { 'Side Scroll': 0, 'Spokes': 1, 'Carousel': 2, 'Wave': 3, 'Pulse': 4, 'Fade': 5 }
         gl.uniform1i(getLoc('u_textEffect'), effectMap[cfg.text_effect] ?? 0)
+        gl.uniform1f(getLoc('u_speed'), cfg.speed_option_1 ?? 1.0)
       }
       if (currentVisualType === 'radial') gl.uniform1f(getLoc('u_bands'), cfg.edges || cfg.bands || 32.0)
       if (currentVisualType === 'bands' || currentVisualType === 'bandsmatrix') gl.uniform1f(getLoc('u_bands'), cfg.band_count || cfg.bands || 16.0)
