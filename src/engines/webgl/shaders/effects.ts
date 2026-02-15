@@ -421,7 +421,9 @@ export const matrixRainShader = `
     // Color
     vec3 color;
     if (u_useGradient) {
-      color = texture2D(u_gradient, vec2(fract(uv.y + u_gradientRoll), 0.5)).rgb * (char + trail);
+      // Use brightness/fall to index gradient for a trailing color effect
+      float gradIdx = fract(brightness + u_gradientRoll);
+      color = texture2D(u_gradient, vec2(gradIdx, 0.5)).rgb * (char + trail);
     } else {
       color = u_primaryColor * (char + trail);
       color += u_secondaryColor * brightness * 0.2;
@@ -451,12 +453,6 @@ export const terrainShader = `
   uniform float u_gradientRoll;
 
   varying vec2 v_position;
-
-  vec3 hsv2rgb(vec3 c) {
-    vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
-    vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
-    return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
-  }
 
   void main() {
     vec2 uv = v_position;
@@ -499,10 +495,15 @@ export const terrainShader = `
     color += u_primaryColor * sun * 2.0;
 
     // Grid
-    color += u_primaryColor * grid * perspective;
+    vec3 gridColor = u_primaryColor;
+    if (u_useGradient) {
+      gridColor = texture2D(u_gradient, vec2(fract(groundUV.y * 0.1 + u_gradientRoll), 0.5)).rgb;
+    }
+    color += gridColor * grid * perspective;
 
     // Terrain line
     if (u_useGradient) {
+      // Use x position for terrain line gradient
       color += texture2D(u_gradient, vec2(fract(uv.x * 0.5 + 0.5 + u_gradientRoll), 0.5)).rgb * line * 2.0 * (1.0 + energy);
     } else {
       color += u_primaryColor * line * 2.0 * (1.0 + energy);
@@ -575,7 +576,9 @@ export const geometricShader = `
       // Color per layer
       vec3 layerColor;
       if (u_useGradient) {
-        layerColor = texture2D(u_gradient, vec2(fract(i / 5.0 + u_gradientRoll), 0.5)).rgb;
+        // Mix position-based and layer-based gradient sampling
+        float gradIdx = fract(length(uv) * 0.5 + i / 5.0 + u_gradientRoll);
+        layerColor = texture2D(u_gradient, vec2(gradIdx, 0.5)).rgb;
       } else {
         layerColor = mix(u_primaryColor, u_secondaryColor, i / 5.0);
       }
@@ -777,7 +780,7 @@ export const digitalRainShader = `
     color *= 0.8 + 0.2 * random(vec2(colIdx, 1.0));
 
     // Beat pulse - flash all active characters
-    color += greenColor * u_beat * tailFade * 0.3;
+    color += u_primaryColor * u_beat * tailFade * 0.3;
 
     // Scanline effect
     float scanline = sin(uv.y * u_resolution.y * 2.0) * 0.1 + 0.9;

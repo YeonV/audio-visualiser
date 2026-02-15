@@ -17,27 +17,46 @@ export function parseGradient(gradientStr: string, size: number = 256): Uint8Arr
 
   if (!ctx) return new Uint8Array(size * 4)
 
-  // CSS linear-gradient strings might not be directly valid for fillStyle
-  // We need to either parse it manually or use a trick.
-  // The trick: create a temporary div, apply the background, and use its style.
-  // BUT: a better way is to parse the string for color stops and use ctx.createLinearGradient.
-
   try {
-    const stops = parseColorStops(gradientStr)
-    const gradient = ctx.createLinearGradient(0, 0, size, 0)
+    if (gradientStr.includes('linear-gradient')) {
+      const stops = parseColorStops(gradientStr)
+      if (stops.length > 0) {
+        const gradient = ctx.createLinearGradient(0, 0, size, 0)
 
-    stops.forEach(stop => {
-      gradient.addColorStop(stop.pos, stop.color)
-    })
+        stops.forEach(stop => {
+          try {
+            gradient.addColorStop(stop.pos, stop.color)
+          } catch (e) {
+            console.warn('Invalid color stop:', stop, e)
+          }
+        })
 
-    ctx.fillStyle = gradient
+        ctx.fillStyle = gradient
+      } else {
+        ctx.fillStyle = '#000'
+      }
+    } else {
+      // Basic fallback for solid colors
+      ctx.fillStyle = gradientStr
+    }
+
+    ctx.clearRect(0, 0, size, 1)
     ctx.fillRect(0, 0, size, 1)
 
-    return new Uint8Array(ctx.getImageData(0, 0, size, 1).data.buffer)
+    const imageData = ctx.getImageData(0, 0, size, 1)
+    return new Uint8Array(imageData.data)
   } catch (e) {
     console.error('Failed to parse gradient:', gradientStr, e)
     // Fallback: simple primary to secondary gradient if parsing fails
-    return new Uint8Array(size * 4).fill(255)
+    const fallback = new Uint8Array(size * 4)
+    for (let i = 0; i < size; i++) {
+      const t = i / (size - 1)
+      fallback[i * 4] = 255 * (1 - t) // R
+      fallback[i * 4 + 1] = 0 // G
+      fallback[i * 4 + 2] = 255 * t // B
+      fallback[i * 4 + 3] = 255 // A
+    }
+    return fallback
   }
 }
 
@@ -54,33 +73,44 @@ function parseColorStops(gradientStr: string): ColorStop[] {
   const stops: ColorStop[] = []
 
   // Extract the part between the first ( and the last )
-  const inner = gradientStr.match(/\((.*)\)$/)?.[1]
-  if (!inner) return stops
+  const firstParen = gradientStr.indexOf('(')
+  const lastParen = gradientStr.lastIndexOf(')')
+  if (firstParen === -1 || lastParen === -1) return stops
+
+  const inner = gradientStr.substring(firstParen + 1, lastParen)
 
   // Split by comma, but ignore commas inside parentheses (like rgb(0,0,0))
   const parts = splitIgnoringParentheses(inner)
 
   // Skip the first part if it's an angle like 90deg
   let startIndex = 0
-  if (parts[0].includes('deg') || parts[0].includes('to ')) {
-    startIndex = 1
+  if (parts.length > 0) {
+    const firstPart = parts[0].trim()
+    if (firstPart.includes('deg') || firstPart.startsWith('to ')) {
+      startIndex = 1
+    }
   }
 
   for (let i = startIndex; i < parts.length; i++) {
     const part = parts[i].trim()
+    if (!part) continue
+
     // A part looks like "rgb(255, 0, 0) 0%" or "#ff0000 50%"
     // Match the color part and the optional percentage
+    // Using a more robust match that handles various color formats
     const match = part.match(/(.*)\s+(\d+)%/)
     if (match) {
       stops.push({
         color: match[1].trim(),
-        pos: parseInt(match[2]) / 100
+        pos: Math.max(0, Math.min(1, parseInt(match[2], 10) / 100))
       })
     } else {
-      // If no percentage, space them out evenly (simplified)
+      // If no percentage, space them out evenly
+      const count = parts.length - startIndex
+      const idx = i - startIndex
       stops.push({
         color: part,
-        pos: (i - startIndex) / (parts.length - startIndex - 1)
+        pos: count > 1 ? idx / (count - 1) : 0
       })
     }
   }

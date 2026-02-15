@@ -779,7 +779,7 @@ export const WebGLVisualiser = ({
       const success = initWebGL()
       if (success) {
         startTimeRef.current = Date.now(); isDrawingRef.current = true
-        particlesRef.current = []; historyRef.current = new Array(128).fill(0); beatRef.current = 0
+        particlesRef.current = []; historyRef.current = new Array(128).fill(0); beatRef.current = 0; previousDataRef.current = []
         draw()
       }
     } else {
@@ -809,16 +809,6 @@ export const WebGLVisualiser = ({
     updateCanvasSize(); window.addEventListener('resize', updateCanvasSize)
     return () => window.removeEventListener('resize', updateCanvasSize)
   }, [])
-
-  // Reinitialize when visual type or custom shader changes
-  useEffect(() => {
-    if (isPlaying && glRef.current) {
-      if (animationRef.current) { cancelAnimationFrame(animationRef.current); animationRef.current = undefined }
-      particlesRef.current = []; historyRef.current = new Array(128).fill(0); beatRef.current = 0; previousDataRef.current = []
-      const success = initWebGL()
-      if (success) draw()
-    }
-  }, [visualType, customShader, isPlaying, initWebGL, draw])
 
   return <canvas ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block', backgroundColor: '#000' }} />
 }
