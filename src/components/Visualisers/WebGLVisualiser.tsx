@@ -99,6 +99,8 @@ export const WebGLVisualiser = ({
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const glRef = useRef<WebGLRenderingContext | null>(null)
   const programRef = useRef<WebGLProgram | null>(null)
+  const melbankTextureRef = useRef<WebGLTexture | null>(null)
+  const historyTextureRef = useRef<WebGLTexture | null>(null)
   const gradientTextureRef = useRef<WebGLTexture | null>(null)
   const currentGradientStrRef = useRef<string | null>(null)
   const animationRef = useRef<number | undefined>(undefined)
@@ -117,6 +119,9 @@ export const WebGLVisualiser = ({
   const beatDataRef = useRef(beatData)
   const frequencyBandsRef = useRef(frequencyBands)
   const configRef = useRef(config)
+
+  // Uniform location cache
+  const locationsRef = useRef<Record<string, WebGLUniformLocation | null>>({})
 
   // Keep refs in sync
   useEffect(() => {
@@ -139,6 +144,14 @@ export const WebGLVisualiser = ({
     }
   }, [theme?.palette?.primary?.main, theme?.palette?.secondary?.main])
 
+  const getLoc = (name: string) => {
+    if (locationsRef.current[name] !== undefined) return locationsRef.current[name]
+    if (!glRef.current || !programRef.current) return null
+    const loc = glRef.current.getUniformLocation(programRef.current, name)
+    locationsRef.current[name] = loc
+    return loc
+  }
+
   // Initialize WebGL
   const initWebGL = useCallback(() => {
     const canvas = canvasRef.current
@@ -156,6 +169,7 @@ export const WebGLVisualiser = ({
     }
 
     glRef.current = gl
+    locationsRef.current = {} // Clear cache
 
     if (programRef.current) {
       gl.deleteProgram(programRef.current)
@@ -350,13 +364,13 @@ export const WebGLVisualiser = ({
         gl.vertexAttribPointer(indexLoc, 1, gl.FLOAT, false, 0, 0)
       }
 
-      gl.uniform2f(gl.getUniformLocation(program, 'u_resolution'), width, height)
-      gl.uniform1f(gl.getUniformLocation(program, 'u_time'), (Date.now() - startTimeRef.current) / 1000)
+      gl.uniform2f(getLoc('u_resolution'), width, height)
+      gl.uniform1f(getLoc('u_time'), (Date.now() - startTimeRef.current) / 1000)
 
       const primaryColor = cfg.primaryColor ? hexToRgb(cfg.primaryColor) : themeColorsRef.current.primary
       const secondaryColor = cfg.secondaryColor ? hexToRgb(cfg.secondaryColor) : themeColorsRef.current.secondary
-      gl.uniform3f(gl.getUniformLocation(program, 'u_primaryColor'), primaryColor[0], primaryColor[1], primaryColor[2])
-      gl.uniform3f(gl.getUniformLocation(program, 'u_secondaryColor'), secondaryColor[0], secondaryColor[1], secondaryColor[2])
+      gl.uniform3f(getLoc('u_primaryColor'), primaryColor[0], primaryColor[1], primaryColor[2])
+      gl.uniform3f(getLoc('u_secondaryColor'), secondaryColor[0], secondaryColor[1], secondaryColor[2])
 
       gl.drawArrays(gl.TRIANGLES, 0, vertices.length / 2)
       gl.disableVertexAttribArray(positionLoc)
@@ -422,13 +436,13 @@ export const WebGLVisualiser = ({
       const ampBuf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, ampBuf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(amplitudes), gl.DYNAMIC_DRAW)
       const ampLoc = gl.getAttribLocation(program, 'a_amplitude'); if (ampLoc !== -1) { gl.enableVertexAttribArray(ampLoc); gl.vertexAttribPointer(ampLoc, 1, gl.FLOAT, false, 0, 0) }
 
-      gl.uniform2f(gl.getUniformLocation(program, 'u_resolution'), width, height)
-      gl.uniform1f(gl.getUniformLocation(program, 'u_time'), (Date.now() - startTimeRef.current) / 1000)
+      gl.uniform2f(getLoc('u_resolution'), width, height)
+      gl.uniform1f(getLoc('u_time'), (Date.now() - startTimeRef.current) / 1000)
 
       const primaryColor = cfg.primaryColor ? hexToRgb(cfg.primaryColor) : themeColorsRef.current.primary
       const secondaryColor = cfg.secondaryColor ? hexToRgb(cfg.secondaryColor) : themeColorsRef.current.secondary
-      gl.uniform3f(gl.getUniformLocation(program, 'u_primaryColor'), primaryColor[0], primaryColor[1], primaryColor[2])
-      gl.uniform3f(gl.getUniformLocation(program, 'u_secondaryColor'), secondaryColor[0], secondaryColor[1], secondaryColor[2])
+      gl.uniform3f(getLoc('u_primaryColor'), primaryColor[0], primaryColor[1], primaryColor[2])
+      gl.uniform3f(getLoc('u_secondaryColor'), secondaryColor[0], secondaryColor[1], secondaryColor[2])
 
       gl.drawArrays(gl.POINTS, 0, particlesRef.current.length)
       gl.disableVertexAttribArray(posLoc); if (velLoc !== -1) gl.disableVertexAttribArray(velLoc); if (lifeLoc !== -1) gl.disableVertexAttribArray(lifeLoc); if (sizeLoc !== -1) gl.disableVertexAttribArray(sizeLoc); if (ampLoc !== -1) gl.disableVertexAttribArray(ampLoc)
@@ -469,8 +483,8 @@ export const WebGLVisualiser = ({
       const idxBuf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, idxBuf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(indices), gl.DYNAMIC_DRAW)
       const idxLoc = gl.getAttribLocation(program, 'a_index'); if (idxLoc !== -1) { gl.enableVertexAttribArray(idxLoc); gl.vertexAttribPointer(idxLoc, 1, gl.FLOAT, false, 0, 0) }
 
-      gl.uniform2f(gl.getUniformLocation(program, 'u_resolution'), width, height)
-      gl.uniform1f(gl.getUniformLocation(program, 'u_time'), (Date.now() - startTimeRef.current) / 1000)
+      gl.uniform2f(getLoc('u_resolution'), width, height)
+      gl.uniform1f(getLoc('u_time'), (Date.now() - startTimeRef.current) / 1000)
 
       gl.drawArrays(gl.TRIANGLES, 0, vertices.length / 2)
       gl.disableVertexAttribArray(posLoc); if (ampLoc !== -1) gl.disableVertexAttribArray(ampLoc); if (idxLoc !== -1) gl.disableVertexAttribArray(idxLoc)
@@ -505,13 +519,13 @@ export const WebGLVisualiser = ({
       const idxBuf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, idxBuf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(indices), gl.DYNAMIC_DRAW)
       const idxLoc = gl.getAttribLocation(program, 'a_index'); if (idxLoc !== -1) { gl.enableVertexAttribArray(idxLoc); gl.vertexAttribPointer(idxLoc, 1, gl.FLOAT, false, 0, 0) }
 
-      gl.uniform2f(gl.getUniformLocation(program, 'u_resolution'), width, height)
-      gl.uniform1f(gl.getUniformLocation(program, 'u_time'), (Date.now() - startTimeRef.current) / 1000)
+      gl.uniform2f(getLoc('u_resolution'), width, height)
+      gl.uniform1f(getLoc('u_time'), (Date.now() - startTimeRef.current) / 1000)
 
       const primaryColor = cfg.primaryColor ? hexToRgb(cfg.primaryColor) : themeColorsRef.current.primary
       const secondaryColor = cfg.secondaryColor ? hexToRgb(cfg.secondaryColor) : themeColorsRef.current.secondary
-      gl.uniform3f(gl.getUniformLocation(program, 'u_primaryColor'), primaryColor[0], primaryColor[1], primaryColor[2])
-      gl.uniform3f(gl.getUniformLocation(program, 'u_secondaryColor'), secondaryColor[0], secondaryColor[1], secondaryColor[2])
+      gl.uniform3f(getLoc('u_primaryColor'), primaryColor[0], primaryColor[1], primaryColor[2])
+      gl.uniform3f(getLoc('u_secondaryColor'), secondaryColor[0], secondaryColor[1], secondaryColor[2])
 
       gl.drawArrays(gl.TRIANGLES, 0, vertices.length / 2)
       gl.disableVertexAttribArray(posLoc); if (ampLoc !== -1) gl.disableVertexAttribArray(ampLoc); if (idxLoc !== -1) gl.disableVertexAttribArray(idxLoc)
@@ -536,23 +550,24 @@ export const WebGLVisualiser = ({
       const posBuf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, posBuf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW)
       const posLoc = gl.getAttribLocation(program, 'a_position'); gl.enableVertexAttribArray(posLoc); gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0)
 
-      const texture = gl.createTexture(); gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, texture)
+      if (!historyTextureRef.current) historyTextureRef.current = gl.createTexture()
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, historyTextureRef.current)
       const textureData = new Uint8Array(historyRef.current.length)
       for (let i = 0; i < historyRef.current.length; i++) textureData[i] = Math.min(255, Math.max(0, historyRef.current[i] * 255))
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.LUMINANCE, historyRef.current.length, 1, 0, gl.LUMINANCE, gl.UNSIGNED_BYTE, textureData)
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
 
-      gl.uniform2f(gl.getUniformLocation(program, 'u_resolution'), width, height)
-      gl.uniform1f(gl.getUniformLocation(program, 'u_time'), ((Date.now() - startTimeRef.current) / 1000) * speed)
-      gl.uniform1i(gl.getUniformLocation(program, 'u_history'), 0)
+      gl.uniform2f(getLoc('u_resolution'), width, height)
+      gl.uniform1f(getLoc('u_time'), ((Date.now() - startTimeRef.current) / 1000) * speed)
+      gl.uniform1i(getLoc('u_history'), 0)
 
       const primaryColor = cfg.primaryColor ? hexToRgb(cfg.primaryColor) : themeColorsRef.current.primary
       const secondaryColor = cfg.secondaryColor ? hexToRgb(cfg.secondaryColor) : themeColorsRef.current.secondary
-      gl.uniform3f(gl.getUniformLocation(program, 'u_primaryColor'), primaryColor[0], primaryColor[1], primaryColor[2])
-      gl.uniform3f(gl.getUniformLocation(program, 'u_secondaryColor'), secondaryColor[0], secondaryColor[1], secondaryColor[2])
+      gl.uniform3f(getLoc('u_primaryColor'), primaryColor[0], primaryColor[1], primaryColor[2])
+      gl.uniform3f(getLoc('u_secondaryColor'), secondaryColor[0], secondaryColor[1], secondaryColor[2])
 
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
-      gl.disableVertexAttribArray(posLoc); gl.deleteBuffer(posBuf); gl.deleteTexture(texture)
+      gl.disableVertexAttribArray(posLoc); gl.deleteBuffer(posBuf)
     },
     []
   )
@@ -574,15 +589,15 @@ export const WebGLVisualiser = ({
       const posBuf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, posBuf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW)
       const posLoc = gl.getAttribLocation(program, 'a_position'); gl.enableVertexAttribArray(posLoc); gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0)
 
-      gl.uniform2f(gl.getUniformLocation(program, 'u_resolution'), width, height)
-      gl.uniform1f(gl.getUniformLocation(program, 'u_time'), (Date.now() - startTimeRef.current) / 1000)
-      gl.uniform1f(gl.getUniformLocation(program, 'u_beat'), beatRef.current)
-      const scaleLoc = gl.getUniformLocation(program, 'u_scale'); if (scaleLoc) gl.uniform1f(scaleLoc, scale)
+      gl.uniform2f(getLoc('u_resolution'), width, height)
+      gl.uniform1f(getLoc('u_time'), (Date.now() - startTimeRef.current) / 1000)
+      gl.uniform1f(getLoc('u_beat'), beatRef.current)
+      const scaleLoc = getLoc('u_scale'); if (scaleLoc) gl.uniform1f(scaleLoc, scale)
 
       const primaryColor = cfg.primaryColor ? hexToRgb(cfg.primaryColor) : themeColorsRef.current.primary
       const secondaryColor = cfg.secondaryColor ? hexToRgb(cfg.secondaryColor) : themeColorsRef.current.secondary
-      gl.uniform3f(gl.getUniformLocation(program, 'u_primaryColor'), primaryColor[0], primaryColor[1], primaryColor[2])
-      gl.uniform3f(gl.getUniformLocation(program, 'u_secondaryColor'), secondaryColor[0], secondaryColor[1], secondaryColor[2])
+      gl.uniform3f(getLoc('u_primaryColor'), primaryColor[0], primaryColor[1], primaryColor[2])
+      gl.uniform3f(getLoc('u_secondaryColor'), secondaryColor[0], secondaryColor[1], secondaryColor[2])
 
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
       gl.disableVertexAttribArray(posLoc); gl.deleteBuffer(posBuf)
@@ -609,69 +624,67 @@ export const WebGLVisualiser = ({
       const posBuf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, posBuf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW)
       const posLoc = gl.getAttribLocation(program, 'a_position'); gl.enableVertexAttribArray(posLoc); gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0)
 
-      const resLoc = gl.getUniformLocation(program, 'u_resolution'); if (resLoc) gl.uniform2f(resLoc, width, height)
-      const timeLoc = gl.getUniformLocation(program, 'u_time'); if (timeLoc) {
+      gl.uniform2f(getLoc('u_resolution'), width, height)
+      const timeLoc = getLoc('u_time'); if (timeLoc) {
         const actualSpeed = cfg.speed ?? speed
         gl.uniform1f(timeLoc, ((Date.now() - startTimeRef.current) / 1000) * actualSpeed)
       }
-      const energyLoc = gl.getUniformLocation(program, 'u_energy'); if (energyLoc) gl.uniform1f(energyLoc, avg * sensitivity)
-      const beatLoc = gl.getUniformLocation(program, 'u_beat'); if (beatLoc) {
+      gl.uniform1f(getLoc('u_energy'), avg * sensitivity)
+      const beatLoc = getLoc('u_beat'); if (beatLoc) {
         const currentBeatData = beatDataRef.current
         if (currentBeatData) beatRef.current += currentBeatData.beatIntensity * 0.2
         else beatRef.current += avg * sensitivity * 0.1
         gl.uniform1f(beatLoc, beatRef.current)
       }
-      const rotLoc = gl.getUniformLocation(program, 'u_rotate'); if (rotLoc) gl.uniform1f(rotLoc, rotation)
-      const brLoc = gl.getUniformLocation(program, 'u_brightness'); if (brLoc) gl.uniform1f(brLoc, brightness)
+      gl.uniform1f(getLoc('u_rotate'), rotation)
+      gl.uniform1f(getLoc('u_brightness'), brightness)
 
       const primaryColor = cfg.primaryColor ? hexToRgb(cfg.primaryColor) : themeColorsRef.current.primary
       const secondaryColor = cfg.secondaryColor ? hexToRgb(cfg.secondaryColor) : themeColorsRef.current.secondary
-      gl.uniform3f(gl.getUniformLocation(program, 'u_primaryColor'), primaryColor[0], primaryColor[1], primaryColor[2])
-      gl.uniform3f(gl.getUniformLocation(program, 'u_secondaryColor'), secondaryColor[0], secondaryColor[1], secondaryColor[2])
+      gl.uniform3f(getLoc('u_primaryColor'), primaryColor[0], primaryColor[1], primaryColor[2])
+      gl.uniform3f(getLoc('u_secondaryColor'), secondaryColor[0], secondaryColor[1], secondaryColor[2])
 
       const freqBands = frequencyBandsRef.current
       const bass = freqBands?.bass ?? avg, mid = freqBands?.mid ?? avg, high = freqBands?.high ?? avg
-      const bassLoc = gl.getUniformLocation(program, 'u_bass'); if (bassLoc) gl.uniform1f(bassLoc, bass * sensitivity)
-      const midLoc = gl.getUniformLocation(program, 'u_mid'); if (midLoc) gl.uniform1f(midLoc, mid * sensitivity)
-      const highLoc = gl.getUniformLocation(program, 'u_high'); if (highLoc) gl.uniform1f(highLoc, high * sensitivity)
+      gl.uniform1f(getLoc('u_bass'), bass * sensitivity)
+      gl.uniform1f(getLoc('u_mid'), mid * sensitivity)
+      gl.uniform1f(getLoc('u_high'), high * sensitivity)
 
       // Game of Life
-      const csLoc = gl.getUniformLocation(program, 'u_cellSize'); if (csLoc) gl.uniform1f(csLoc, cfg.cell_size ?? cfg.base_game_speed ?? 8.0)
-      const ibLoc = gl.getUniformLocation(program, 'u_injectBeat'); if (ibLoc) gl.uniform1f(ibLoc, beatDataRef.current?.isBeat && cfg.beat_inject !== false ? 1.0 : 0.0)
+      gl.uniform1f(getLoc('u_cellSize'), cfg.cell_size ?? cfg.base_game_speed ?? 8.0)
+      gl.uniform1f(getLoc('u_injectBeat'), beatDataRef.current?.isBeat && cfg.beat_inject !== false ? 1.0 : 0.0)
 
       // Digital Rain
-      const denLoc = gl.getUniformLocation(program, 'u_density'); if (denLoc) gl.uniform1f(denLoc, cfg.count ?? cfg.density ?? 1.9)
-      const spdLoc = gl.getUniformLocation(program, 'u_speed'); if (spdLoc) {
+      gl.uniform1f(getLoc('u_density'), cfg.count ?? cfg.density ?? 1.9)
+      const spdLoc = getLoc('u_speed'); if (spdLoc) {
         const s = cfg.add_speed ? cfg.add_speed / 20.0 : (cfg.run_seconds ? 2.0 / cfg.run_seconds : 1.5)
         gl.uniform1f(spdLoc, s)
       }
-      const tlLoc = gl.getUniformLocation(program, 'u_tailLength'); if (tlLoc) gl.uniform1f(tlLoc, (cfg.tail ?? 67) / 100.0)
-      const giLoc = gl.getUniformLocation(program, 'u_glowIntensity'); if (giLoc) gl.uniform1f(giLoc, cfg.multiplier ? cfg.multiplier / 10.0 : 1.0)
+      gl.uniform1f(getLoc('u_tailLength'), (cfg.tail ?? 67) / 100.0)
+      gl.uniform1f(getLoc('u_glowIntensity'), cfg.multiplier ? cfg.multiplier / 10.0 : 1.0)
 
       // Flame
-      const inLoc = gl.getUniformLocation(program, 'u_intensity'); if (inLoc) gl.uniform1f(inLoc, cfg.intensity ?? 1.0)
-      const wbLoc = gl.getUniformLocation(program, 'u_wobble'); if (wbLoc) gl.uniform1f(wbLoc, cfg.velocity ?? 0.3)
-      const lcLoc = gl.getUniformLocation(program, 'u_lowColor'); if (lcLoc) { const c = hexToRgb(cfg.low_band ?? cfg.low_color ?? '#FF4400'); gl.uniform3f(lcLoc, c[0], c[1], c[2]) }
-      const mcLoc = gl.getUniformLocation(program, 'u_midColor'); if (mcLoc) { const c = hexToRgb(cfg.mid_band ?? cfg.mid_color ?? '#FFAA00'); gl.uniform3f(mcLoc, c[0], c[1], c[2]) }
-      const hcLoc = gl.getUniformLocation(program, 'u_highColor'); if (hcLoc) { const c = hexToRgb(cfg.high_band ?? cfg.high_color ?? '#FFFF00'); gl.uniform3f(hcLoc, c[0], c[1], c[2]) }
+      const lcLoc = getLoc('u_lowColor'); if (lcLoc) { const c = hexToRgb(cfg.low_band ?? cfg.low_color ?? '#FF4400'); gl.uniform3f(lcLoc, c[0], c[1], c[2]) }
+      const mcLoc = getLoc('u_midColor'); if (mcLoc) { const c = hexToRgb(cfg.mid_band ?? cfg.mid_color ?? '#FFAA00'); gl.uniform3f(mcLoc, c[0], c[1], c[2]) }
+      const hcLoc = getLoc('u_highColor'); if (hcLoc) { const c = hexToRgb(cfg.high_band ?? cfg.high_color ?? '#FFFF00'); gl.uniform3f(hcLoc, c[0], c[1], c[2]) }
 
       // Plasma
-      const twLoc = gl.getUniformLocation(program, 'u_twist'); if (twLoc) gl.uniform1f(twLoc, cfg.twist ?? 0.1)
+      gl.uniform1f(getLoc('u_twist'), cfg.twist ?? 0.1)
 
       // Equalizer
-      const bdLoc = gl.getUniformLocation(program, 'u_bands'); if (bdLoc) gl.uniform1f(bdLoc, cfg.bands ?? 16.0)
-      const rmLoc = gl.getUniformLocation(program, 'u_ringMode'); if (rmLoc) gl.uniform1f(rmLoc, (cfg.ring || cfg.ring_mode) ? 1.0 : 0.0)
-      const cmLoc = gl.getUniformLocation(program, 'u_centerMode'); if (cmLoc) gl.uniform1f(cmLoc, (cfg.center || cfg.center_mode) ? 1.0 : 0.0)
-      const sLoc = gl.getUniformLocation(program, 'u_spin'); if (sLoc) {
+      gl.uniform1f(getLoc('u_bands'), cfg.bands ?? 16.0)
+      gl.uniform1f(getLoc('u_ringMode'), (cfg.ring || cfg.ring_mode) ? 1.0 : 0.0)
+      gl.uniform1f(getLoc('u_centerMode'), (cfg.center || cfg.center_mode) ? 1.0 : 0.0)
+      const sLoc = getLoc('u_spin'); if (sLoc) {
         if (cfg.spin || cfg.spin_enabled) beatRef.current += bass * (cfg.spin_multiplier ?? 1.0) * 0.05
         gl.uniform1f(sLoc, beatRef.current)
       }
 
       // Gradient support
-      const useGradLoc = gl.getUniformLocation(program, 'u_useGradient')
-      const gradLoc = gl.getUniformLocation(program, 'u_gradient')
-      const gradRollLoc = gl.getUniformLocation(program, 'u_gradientRoll')
-      if (useGradLoc && gradLoc && cfg.gradient) {
+      const useGradLoc = getLoc('u_useGradient')
+      const gradLoc = getLoc('u_gradient')
+      const gradRollLoc = getLoc('u_gradientRoll')
+      if (gradLoc && cfg.gradient) {
         if (!gradientTextureRef.current) gradientTextureRef.current = gl.createTexture()
         if (currentGradientStrRef.current !== cfg.gradient) {
           const gradData = parseGradient(cfg.gradient); gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, gradientTextureRef.current)
@@ -679,16 +692,18 @@ export const WebGLVisualiser = ({
           gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
           currentGradientStrRef.current = cfg.gradient
         }
-        gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, gradientTextureRef.current); gl.uniform1i(gradLoc, 1); gl.uniform1i(useGradLoc, 1)
+        gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, gradientTextureRef.current); gl.uniform1i(gradLoc, 1)
+        if (useGradLoc) gl.uniform1i(useGradLoc, 1)
         if (gradRollLoc) {
           const rollSpeed = cfg.gradient_roll ?? 0
           gl.uniform1f(gradRollLoc, ((Date.now() - startTimeRef.current) / 1000 * rollSpeed) % 1.0)
         }
       } else if (useGradLoc) gl.uniform1i(useGradLoc, 0)
 
-      const melBankLoc = gl.getUniformLocation(program, 'u_melbank')
+      const melBankLoc = getLoc('u_melbank')
       if (melBankLoc && data.length > 0) {
-        const texture = gl.createTexture(); gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, texture)
+        if (!melbankTextureRef.current) melbankTextureRef.current = gl.createTexture()
+        gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, melbankTextureRef.current)
         const texData = new Uint8Array(data.length)
         for (let i = 0; i < data.length; i++) texData[i] = Math.min(255, Math.max(0, data[i] * 255 * sensitivity))
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.LUMINANCE, data.length, 1, 0, gl.LUMINANCE, gl.UNSIGNED_BYTE, texData)
@@ -697,31 +712,33 @@ export const WebGLVisualiser = ({
       }
 
       // Remaining uniforms
-      const zLoc = gl.getUniformLocation(program, 'u_zoom'); if (zLoc) gl.uniform1f(zLoc, cfg.zoom ?? cfg.stretch ?? 3.0)
-      const azLoc = gl.getUniformLocation(program, 'u_audioZoom'); if (azLoc) gl.uniform1f(azLoc, cfg.multiplier ?? cfg.audio_zoom ?? 1.0)
-      const blurLoc = gl.getUniformLocation(program, 'u_blur'); if (blurLoc) gl.uniform1f(blurLoc, cfg.mask_cutoff ?? cfg.blur ?? 0.5)
-      const mirLoc = gl.getUniformLocation(program, 'u_mirrors'); if (mirLoc) gl.uniform1f(mirLoc, cfg.screen ?? cfg.mirrors ?? 2.0)
-      const flpLoc = gl.getUniformLocation(program, 'u_flip'); if (flpLoc) gl.uniform1f(flpLoc, (cfg.align === 'invert' || cfg.flip) ? 1.0 : 0.0)
-      const bsLoc = gl.getUniformLocation(program, 'u_blockSize'); if (bsLoc) gl.uniform1f(bsLoc, cfg.block_count ?? cfg.block_size ?? 10.0)
-      const kLoc = gl.getUniformLocation(program, 'u_keys'); if (kLoc) gl.uniform1f(kLoc, (cfg.stretch_horizontal / 6.25) || (cfg.keys ?? 16.0))
-      const tdLoc = gl.getUniformLocation(program, 'u_density'); if (tdLoc && visualType === 'texter') gl.uniform1f(tdLoc, (cfg.height_percent / 10.0) || (cfg.density ?? 1.0))
-      const rbLoc = gl.getUniformLocation(program, 'u_bands'); if (rbLoc && visualType === 'radial') gl.uniform1f(rbLoc, cfg.edges || cfg.bands || 32.0)
-      const bcLoc = gl.getUniformLocation(program, 'u_bands'); if (bcLoc && (visualType === 'bands' || visualType === 'bandsmatrix')) gl.uniform1f(bcLoc, cfg.band_count || cfg.bands || 16.0)
-      const wbndLoc = gl.getUniformLocation(program, 'u_bands'); if (wbndLoc && visualType === 'waterfall') gl.uniform1f(wbndLoc, cfg.bands || 16.0)
-      const wspdLoc = gl.getUniformLocation(program, 'u_speed'); if (wspdLoc && visualType === 'waterfall') gl.uniform1f(wspdLoc, (3.0 / cfg.drop_secs) || (cfg.speed ?? 1.0))
+      gl.uniform1f(getLoc('u_zoom'), cfg.zoom ?? cfg.stretch ?? 3.0)
+      gl.uniform1f(getLoc('u_audioZoom'), cfg.multiplier ?? cfg.audio_zoom ?? 1.0)
+      gl.uniform1f(getLoc('u_blur'), cfg.mask_cutoff ?? cfg.blur ?? 0.5)
+      gl.uniform1f(getLoc('u_mirrors'), cfg.screen ?? cfg.mirrors ?? 2.0)
+      gl.uniform1f(getLoc('u_flip'), (cfg.align === 'invert' || cfg.flip) ? 1.0 : 0.0)
+      gl.uniform1f(getLoc('u_blockSize'), cfg.block_count ?? cfg.block_size ?? 10.0)
+      gl.uniform1f(getLoc('u_keys'), (cfg.stretch_horizontal / 6.25) || (cfg.keys ?? 16.0))
+      if (visualType === 'texter') gl.uniform1f(getLoc('u_density'), (cfg.height_percent / 10.0) || (cfg.density ?? 1.0))
+      if (visualType === 'radial') gl.uniform1f(getLoc('u_bands'), cfg.edges || cfg.bands || 32.0)
+      if (visualType === 'bands' || visualType === 'bandsmatrix') gl.uniform1f(getLoc('u_bands'), cfg.band_count || cfg.bands || 16.0)
+      if (visualType === 'waterfall') {
+        gl.uniform1f(getLoc('u_bands'), cfg.bands || 16.0)
+        gl.uniform1f(getLoc('u_speed'), (3.0 / cfg.drop_secs) || (cfg.speed ?? 1.0))
+      }
 
-      const bgcLoc = gl.getUniformLocation(program, 'u_bgColor'); if (bgcLoc) { const c = hexToRgb(cfg.bg_color ?? cfg.backgroundColor ?? '#000000'); gl.uniform3f(bgcLoc, c[0], c[1], c[2]) }
-      const bgbLoc = gl.getUniformLocation(program, 'u_backgroundBrightness'); if (bgbLoc) gl.uniform1f(bgbLoc, cfg.background_brightness ?? 1.0)
-      const mltLoc = gl.getUniformLocation(program, 'u_multiplier'); if (mltLoc) gl.uniform1f(mltLoc, cfg.multiplier ?? 0.5)
-      const mszLoc = gl.getUniformLocation(program, 'u_minSize'); if (mszLoc) gl.uniform1f(mszLoc, cfg.min_size ?? 0.3)
-      const frLoc = gl.getUniformLocation(program, 'u_frequencyRange'); if (frLoc) gl.uniform1f(frLoc, typeof cfg.frequency_range === 'number' ? cfg.frequency_range : 0.0)
-      const clLoc = gl.getUniformLocation(program, 'u_clip'); if (clLoc) gl.uniform1f(clLoc, cfg.clip ? 1.0 : 0.0)
-      const spiLoc = gl.getUniformLocation(program, 'u_spin'); if (spiLoc && visualType === 'image') gl.uniform1f(spiLoc, cfg.spin ? 1.0 : 0.0)
+      const bgcLoc = getLoc('u_bgColor'); if (bgcLoc) { const c = hexToRgb(cfg.bg_color ?? cfg.backgroundColor ?? '#000000'); gl.uniform3f(bgcLoc, c[0], c[1], c[2]) }
+      gl.uniform1f(getLoc('u_backgroundBrightness'), cfg.background_brightness ?? 1.0)
+      gl.uniform1f(getLoc('u_multiplier'), cfg.multiplier ?? 0.5)
+      gl.uniform1f(getLoc('u_minSize'), cfg.min_size ?? 0.3)
+      gl.uniform1f(getLoc('u_frequencyRange'), typeof cfg.frequency_range === 'number' ? cfg.frequency_range : 0.0)
+      gl.uniform1f(getLoc('u_clip'), cfg.clip ? 1.0 : 0.0)
+      if (visualType === 'image') gl.uniform1f(getLoc('u_spin'), cfg.spin ? 1.0 : 0.0)
 
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
       gl.disableVertexAttribArray(posLoc); gl.deleteBuffer(posBuf)
     },
-    [visualType]
+    [visualType, getLoc]
   )
 
   // Main draw function
@@ -790,7 +807,14 @@ export const WebGLVisualiser = ({
     return () => {
       isDrawingRef.current = false
       if (animationRef.current) { cancelAnimationFrame(animationRef.current); animationRef.current = undefined }
-      if (glRef.current && gradientTextureRef.current) { glRef.current.deleteTexture(gradientTextureRef.current); gradientTextureRef.current = null }
+      if (glRef.current) {
+        if (gradientTextureRef.current) glRef.current.deleteTexture(gradientTextureRef.current)
+        if (melbankTextureRef.current) glRef.current.deleteTexture(melbankTextureRef.current)
+        if (historyTextureRef.current) glRef.current.deleteTexture(historyTextureRef.current)
+        gradientTextureRef.current = null
+        melbankTextureRef.current = null
+        historyTextureRef.current = null
+      }
     }
   }, [isPlaying, initWebGL, draw])
 

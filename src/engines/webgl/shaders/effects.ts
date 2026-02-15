@@ -421,9 +421,12 @@ export const matrixRainShader = `
     // Color
     vec3 color;
     if (u_useGradient) {
-      // Use brightness/fall to index gradient for a trailing color effect
-      float gradIdx = fract(brightness + u_gradientRoll);
+      // Index gradient by brightness (head to tail) mixed with column randomness
+      float gradIdx = fract(brightness * 0.8 + colRand * 0.2 + u_gradientRoll);
       color = texture2D(u_gradient, vec2(gradIdx, 0.5)).rgb * (char + trail);
+
+      // Add a bright head
+      color = mix(color, vec3(1.0), pow(brightness, 10.0));
     } else {
       color = u_primaryColor * (char + trail);
       color += u_secondaryColor * brightness * 0.2;
@@ -576,9 +579,12 @@ export const geometricShader = `
       // Color per layer
       vec3 layerColor;
       if (u_useGradient) {
-        // Mix position-based and layer-based gradient sampling
-        float gradIdx = fract(length(uv) * 0.5 + i / 5.0 + u_gradientRoll);
+        // Sample gradient based on layer index and roll
+        float gradIdx = fract(i / 5.0 + u_gradientRoll);
         layerColor = texture2D(u_gradient, vec2(gradIdx, 0.5)).rgb;
+
+        // Ensure some minimum visibility
+        layerColor = mix(layerColor, vec3(0.5), 0.1);
       } else {
         layerColor = mix(u_primaryColor, u_secondaryColor, i / 5.0);
       }
@@ -587,7 +593,11 @@ export const geometricShader = `
 
     // Center glow
     float centerGlow = exp(-length(uv) * 3.0) * energy;
-    color += u_primaryColor * centerGlow;
+    vec3 glowColor = u_primaryColor;
+    if (u_useGradient) {
+      glowColor = texture2D(u_gradient, vec2(u_gradientRoll, 0.5)).rgb;
+    }
+    color += glowColor * centerGlow;
 
     // Energy boost
     color *= 0.8 + energy * 0.8;
