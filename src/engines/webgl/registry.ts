@@ -30,7 +30,11 @@ export type VisualisationType = WebGLVisualisationType | Extract<keyof typeof VI
  * Use with Autocomplete's groupBy prop: groupBy={(option) => option.category}
  */
 export const ALL_VISUALIZERS_WITH_CATEGORIES: Array<VisualizerOption | WebGLVisualizerOption> = [
-  ...ALL_WEBGL_VISUALIZERS,
+  // Filter out WebGL visualizers that are already in the schema-based registry
+  // to avoid duplication in the UI.
+  ...ALL_WEBGL_VISUALIZERS.filter(v =>
+    !VISUALIZER_REGISTRY[v.id]
+  ),
   ...ALL_VISUALIZERS
 ]
 

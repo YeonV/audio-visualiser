@@ -1,7 +1,7 @@
 import type { ButterchurnConfig } from '../../components/Visualisers/ButterchurnVisualiser'
 import type { AstrofoxConfig, AstrofoxLayer } from '../../components/Visualisers/AstrofoxVisualiser'
 import { DEFAULT_ASTROFOX_CONFIG } from '../../components/Visualisers/AstrofoxVisualiser'
-import { getVisualizerConfig } from '../../_generated/registry'
+import { getVisualizerConfig, getVisualizerIds } from '../../_generated/registry'
 
 export interface CustomAstrofoxPreset {
   name: string
@@ -36,10 +36,7 @@ export interface StoreConfigsActions {
 const storeConfigs = (set: any, get: any) => {
   // Initialize visualizer configs with default values immediately
   const initialConfigs: Record<string, any> = {}
-  const visualizerIds = [
-    'fluid', 'wavemountain', 'bladewave', 'hexgrid', 
-    'spiralgalaxy', 'auroraborealis', 'frequencyrings', 'neonterrain'
-  ]
+  const visualizerIds = getVisualizerIds()
   
   visualizerIds.forEach(id => {
     initialConfigs[id] = getVisualizerConfig(id)
@@ -145,10 +142,7 @@ const storeConfigs = (set: any, get: any) => {
 
   initializeConfigs: () => {
     const configs: Record<string, any> = {}
-    const visualizerIds = [
-      'fluid', 'wavemountain', 'bladewave', 'hexgrid', 
-      'spiralgalaxy', 'auroraborealis', 'frequencyrings', 'neonterrain'
-    ]
+    const visualizerIds = getVisualizerIds()
     
     visualizerIds.forEach(id => {
       configs[id] = getVisualizerConfig(id)

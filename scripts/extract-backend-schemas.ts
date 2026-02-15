@@ -139,25 +139,6 @@ async function fetchGitHubDirectory(etag: string | null = null): Promise<{ files
 }
 
 /**
- * Fetch directory listing from GitHub API
- */
-async function fetchGitHubDirectoryLegacy(): Promise<GitHubFile[]> {
-  console.log('📂 Fetching effects directory from GitHub API...')
-  const response = await fetch(GITHUB_API_BASE)
-  if (!response.ok) {
-    throw new Error(`Failed to fetch directory: ${response.statusText}`)
-  }
-  
-  const files = await response.json() as any[]
-  return files.filter((file: any) => 
-    file.type === 'file' && 
-    file.name.endsWith('.py') &&
-    file.name !== '__init__.py' &&
-    !file.name.startsWith('template')  // Skip template files
-  )
-}
-
-/**
  * Fetch Python file content from GitHub
  */
 async function fetchGitHubFile(url: string): Promise<string> {
@@ -169,21 +150,48 @@ async function fetchGitHubFile(url: string): Promise<string> {
 }
 
 /**
- * Check if Python file defines a Twod-based effect
- * Looks for class definitions that inherit from Twod
+ * Check if Python file defines a Twod-based or 2D/Matrix effect
  */
-function isTwodEffect(content: string): boolean {
-  // Matches: class XYZ(Twod) or class XYZ(Twod, ...) or class XYZ(..., Twod, ...)
+function isWebGLEffect(content: string): boolean {
+  // Matches: class XYZ(Twod) or CATEGORY = "2D" or CATEGORY = "Matrix"
   const classRegex = /class\s+\w+\([^)]*\bTwod\b[^)]*\):/
-  return classRegex.test(content)
+  const categoryRegex = /CATEGORY\s*=\s*["'](2D|Matrix)["']/i
+  return classRegex.test(content) || categoryRegex.test(content)
 }
 
 /**
- * Extract effect name from Python filename
- * Strips .py extension and preserves original naming (with underscores)
+ * Mapping of backend filenames to frontend visualizer IDs
+ */
+const BACKEND_TO_FRONTEND_MAP: Record<string, string> = {
+  'digitalrain2d': 'digitalrain',
+  'flame2d': 'flame',
+  'game_of_life': 'gameoflife',
+  'gifplayer': 'gif',
+  'imagespin': 'gif',
+  'plasmawled': 'plasmawled2d',
+  'soap2d': 'soap',
+  'texter2d': 'texter',
+  'waterfall2d': 'waterfall',
+  'bands_matrix': 'bandsmatrix',
+  'equalizer2d': 'equalizer2d',
+  'noise2d': 'noise2d',
+  'plasma2d': 'plasma2d',
+  'radial': 'radial',
+  'bleep': 'bleep',
+  'clone': 'clone',
+  'concentric': 'concentric',
+  'bands': 'bands',
+  'blender': 'blender',
+  'blocks': 'blocks',
+  'keybeat2d': 'keybeat2d'
+}
+
+/**
+ * Extract effect name from Python filename and map to frontend ID
  */
 function filenameToEffectName(filename: string): string {
-  return filename.replace('.py', '')
+  const baseName = filename.replace('.py', '')
+  return BACKEND_TO_FRONTEND_MAP[baseName] || baseName.replace(/2d$/, '')
 }
 
 /**
@@ -340,46 +348,54 @@ function generateSchemasFile(schemas: Record<string, EffectSchema>): string {
  * ⚠️ AUTO-GENERATED - DO NOT EDIT MANUALLY
  * Generated from: https://github.com/LedFx/LedFx/tree/main/ledfx/effects
  * 
- * Effect names match backend Python filenames for consistency.
- * All Twod-based 2D matrix effects are auto-discovered.
- * 
  * Run \`pnpm generate:backend\` to regenerate.
  */
 
-export const VISUALISER_SCHEMAS: Record<string, any[]> = {\n`
+import { VisualizerSchema } from '../../../schemas/base.schema'
+
+export const VISUALISER_SCHEMAS: Record<string, VisualizerSchema> = {\n`
 
   for (const [key, schema] of Object.entries(schemas)) {
-    output += `  "${key}": [\n`
+    const displayName = key.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+
+    output += `  "${key}": {\n`
+    output += `    $id: '${key}',\n`
+    output += `    displayName: '${displayName}',\n`
+    output += `    type: 'object',\n`
+    output += `    properties: {\n`
     
     for (const field of schema.fields) {
-      output += `    {\n`
-      output += `      id: '${field.id}',\n`
-      output += `      title: '${field.title}',\n`
-      output += `      type: '${field.type}'`
+      const isHidden = schema.hiddenKeys.includes(field.id)
       
+      output += `      "${field.id}": {\n`
+      output += `        type: '${field.type === 'color' ? 'string' : field.type === 'integer' ? 'number' : field.type}',\n`
+      output += `        title: '${field.title}',\n`
       if (field.description) {
-        output += `,\n      description: '${field.description}'`
+        output += `        description: '${field.description.replace(/'/g, "\\'")}',\n`
       }
-      if (field.min !== undefined) {
-        output += `,\n      min: ${field.min}`
+      if (field.default !== undefined) {
+        output += `        default: ${JSON.stringify(field.default)},\n`
       }
-      if (field.max !== undefined) {
-        output += `,\n      max: ${field.max}`
-      }
-      if (field.step !== undefined) {
-        output += `,\n      step: ${field.step}`
-      }
-      if (field.enum) {
-        output += `,\n      enum: ${JSON.stringify(field.enum)}`
-      }
-      if (field.gradient !== undefined) {
-        output += `,\n      gradient: ${field.gradient}`
+      if (field.min !== undefined) output += `        minimum: ${field.min},\n`
+      if (field.max !== undefined) output += `        maximum: ${field.max},\n`
+
+      if (field.type === 'color') {
+        output += `        format: 'color',\n`
+        if (field.gradient) output += `        isGradient: true,\n`
       }
       
-      output += `\n    },\n`
+      output += `        ui: {\n`
+      if (isHidden) output += `          hidden: true,\n`
+      output += `        }\n`
+      output += `      },\n`
     }
     
-    output += `  ],\n`
+    output += `    },\n`
+    output += `    required: ${JSON.stringify(schema.fields.map(f => f.id))},\n`
+    output += `    metadata: {\n`
+    output += `      category: 'Matrix Effects'\n`
+    output += `    }\n`
+    output += `  },\n`
   }
 
   output += `}\n`
@@ -396,9 +412,6 @@ function generateDefaultsFile(schemas: Record<string, EffectSchema>): string {
  * ⚠️ AUTO-GENERATED - DO NOT EDIT MANUALLY
  * Generated from: https://github.com/LedFx/LedFx/tree/main/ledfx/effects
  * 
- * Effect names match backend Python filenames for consistency.
- * All Twod-based 2D matrix effects are auto-discovered.
- * 
  * Run \`pnpm generate:backend\` to regenerate.
  */
 
@@ -414,14 +427,14 @@ export const DEFAULT_CONFIGS: Record<string, any> = {\n`
 
 /**
  * Generate backend mapping file
- * Now 1:1 mapping since frontend names match backend filenames
  */
-function generateBackendMappingFile(schemas: Record<string, EffectSchema>): string {
+function generateBackendMappingFile(schemas: Record<string, EffectSchema>, originalNames: Record<string, string>): string {
   const backendMapping: Record<string, string> = {}
   
-  for (const effectName of Object.keys(schemas)) {
-    // Effect name IS the backend name (no transformation needed)
-    backendMapping[effectName] = effectName
+  for (const [frontendId, backendFilename] of Object.entries(originalNames)) {
+    if (schemas[frontendId]) {
+      backendMapping[frontendId] = backendFilename
+    }
   }
 
   const output = `/**
@@ -429,9 +442,6 @@ function generateBackendMappingFile(schemas: Record<string, EffectSchema>): stri
  * 
  * ⚠️ AUTO-GENERATED - DO NOT EDIT MANUALLY
  * Generated from: https://github.com/LedFx/LedFx/tree/main/ledfx/effects
- * 
- * This is now a 1:1 mapping since frontend effect names match backend filenames.
- * Effect names are preserved exactly as they appear in the backend (e.g., game_of_life, flame2d).
  * 
  * Run \`pnpm generate:backend\` to regenerate.
  */
@@ -446,11 +456,12 @@ export const VISUAL_TO_BACKEND_EFFECT: Record<string, string> = ${JSON.stringify
  * Main execution - Auto-discover and generate
  */
 async function main() {
-  console.log('🔄 Auto-discovering Twod effects from LedFx backend...\n')
+  console.log('🔄 Auto-discovering 2D/Matrix effects from LedFx backend...\n')
 
   fs.ensureDirSync(OUTPUT_DIR)
   
   const schemas: Record<string, EffectSchema> = {}
+  const originalNames: Record<string, string> = {}
   let processed = 0
   let cached = 0
   let skipped = 0
@@ -467,6 +478,9 @@ async function main() {
       console.log('📦 Using cached schemas (no changes detected)\n')
       for (const [effectName, entry] of Object.entries(cache.files)) {
         schemas[effectName] = entry.schema
+        // Try to reconstruct original backend name for mapping
+        const originalName = Object.keys(BACKEND_TO_FRONTEND_MAP).find(k => BACKEND_TO_FRONTEND_MAP[k] === effectName) || effectName
+        originalNames[effectName] = originalName
         cached++
       }
     } else {
@@ -474,6 +488,7 @@ async function main() {
       const newCache: CacheData = { etag: etag || cache.etag, files: {} }
       
       for (const file of files) {
+        const backendFilename = file.name.replace('.py', '')
         const effectName = filenameToEffectName(file.name)
         
         try {
@@ -482,6 +497,7 @@ async function main() {
           if (cachedEntry && cachedEntry.sha === (file as any).sha) {
             console.log(`📦 ${effectName} (cached)`)
             schemas[effectName] = cachedEntry.schema
+            originalNames[effectName] = backendFilename
             newCache.files[effectName] = cachedEntry
             cached++
             continue
@@ -491,9 +507,9 @@ async function main() {
           console.log(`Fetching: ${file.download_url}`)
           const content = await fetchGitHubFile(file.download_url)
           
-          // Check if this is a Twod-based effect
-          if (!isTwodEffect(content)) {
-            console.log(`⏭️  Skipping ${file.name} (not a Twod effect)`)
+          // Check if this is a WebGL-relevant effect
+          if (!isWebGLEffect(content)) {
+            console.log(`⏭️  Skipping ${file.name} (not a 2D/Matrix effect)`)
             skipped++
             continue
           }
@@ -501,6 +517,7 @@ async function main() {
           // Parse the effect schema
           const schema = parsePythonEffect(content, effectName)
           schemas[effectName] = schema
+          originalNames[effectName] = backendFilename
           
           // Cache it
           newCache.files[effectName] = {
@@ -535,7 +552,7 @@ async function main() {
     
     const schemasContent = generateSchemasFile(schemas)
     const defaultsContent = generateDefaultsFile(schemas)
-    const mappingContent = generateBackendMappingFile(schemas)
+    const mappingContent = generateBackendMappingFile(schemas, originalNames)
 
     await fs.writeFile(path.join(OUTPUT_DIR, 'schemas.ts'), schemasContent)
     await fs.writeFile(path.join(OUTPUT_DIR, 'defaults.ts'), defaultsContent)
@@ -548,7 +565,7 @@ async function main() {
     if (cached > 0) {
       console.log(`   ⚡ Cached ${cached} effects (no GitHub requests!)`)
     }
-    console.log('   New Twod effects in backend will be automatically discovered!')
+    console.log('   New 2D/Matrix effects in backend will be automatically discovered!')
     
   } catch (error) {
     console.error('\n❌ Fatal error during auto-discovery:', error)

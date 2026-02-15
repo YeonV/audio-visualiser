@@ -83,7 +83,7 @@ export const VisualiserCanvas = ({
   
   const activeCustomShader = useStore(state => state.activeCustomShader)
 
-  const config = useMemo(() => DEFAULT_CONFIGS[visualType] || {}, [visualType])
+  const config = useMemo(() => visualizerConfigs[visualType] || DEFAULT_CONFIGS[visualType] || {}, [visualType, visualizerConfigs])
 
   return (
     <CanvasContainer background={configData?.background}>

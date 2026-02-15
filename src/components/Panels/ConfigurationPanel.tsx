@@ -459,11 +459,10 @@ const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({
           </Box>
         ) : (
           (() => {
+            const uiSchema = VISUALIZER_REGISTRY[visualType]?.getUISchema?.(config)
+
             // Use custom form component if provided (integrated mode)
             if (ConfigFormComponent && effects) {
-              // Get schema from visualizer registry (schema-first architecture)
-              const uiSchema = VISUALIZER_REGISTRY[visualType]?.getUISchema?.(config)
-              
               return (
                 <ConfigFormComponent
                   schema={uiSchema}
@@ -475,7 +474,7 @@ const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({
             }
 
             // Fallback to simple form (standalone mode)
-            return <SimpleConfigForm config={config} onChange={handleEffectConfig} />
+            return <SimpleConfigForm config={config} onChange={handleEffectConfig} schema={uiSchema} />
           })()
         )}
 

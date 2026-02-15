@@ -282,6 +282,23 @@ async function generate() {
   
   console.log(`\nSuccessfully loaded ${schemas.length} schema(s)\n`)
   
+  // Also load backend-generated schemas if they exist
+  const backendSchemasPath = path.join(OUTPUT_DIR, 'webgl/schemas.ts')
+  if (fs.existsSync(backendSchemasPath)) {
+    console.log('📦 Loading backend-discovered schemas...')
+    try {
+      const backendModule = await import('file://' + backendSchemasPath.replace(/\\/g, '/'))
+      const backendSchemas = backendModule.VISUALISER_SCHEMAS
+      if (backendSchemas) {
+        const backendSchemaList = Object.values(backendSchemas) as VisualizerSchema[]
+        schemas.push(...backendSchemaList)
+        console.log(`    ✓ Loaded ${backendSchemaList.length} backend schema(s)`)
+      }
+    } catch (err: any) {
+      console.error(`    ✗ Failed to load backend schemas:`, err.message || err)
+    }
+  }
+
   // Generate outputs
   let typesOutput = `/**
  * AUTO-GENERATED - DO NOT EDIT

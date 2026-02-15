@@ -971,7 +971,7 @@ export const WebGLVisualiser = ({
       // Effect-specific uniforms
       // Game of Life
       const cellSizeLoc = gl.getUniformLocation(program, 'u_cellSize')
-      if (cellSizeLoc) gl.uniform1f(cellSizeLoc, config.cell_size ?? 8.0)
+      if (cellSizeLoc) gl.uniform1f(cellSizeLoc, config.cell_size ?? config.base_game_speed ?? 8.0)
 
       const injectBeatLoc = gl.getUniformLocation(program, 'u_injectBeat')
       if (injectBeatLoc)
@@ -979,39 +979,42 @@ export const WebGLVisualiser = ({
 
       // Digital Rain
       const densityLoc = gl.getUniformLocation(program, 'u_density')
-      if (densityLoc) gl.uniform1f(densityLoc, config.density ?? 1.0)
+      if (densityLoc) gl.uniform1f(densityLoc, config.count ?? config.density ?? 1.9)
 
       const speedLoc = gl.getUniformLocation(program, 'u_speed')
-      if (speedLoc) gl.uniform1f(speedLoc, config.speed ?? 1.5)
+      if (speedLoc) {
+        const speed = config.add_speed ? config.add_speed / 20.0 : (config.run_seconds ? 2.0 / config.run_seconds : 1.5)
+        gl.uniform1f(speedLoc, speed)
+      }
 
       const tailLengthLoc = gl.getUniformLocation(program, 'u_tailLength')
-      if (tailLengthLoc) gl.uniform1f(tailLengthLoc, config.tail_length ?? 0.5)
+      if (tailLengthLoc) gl.uniform1f(tailLengthLoc, (config.tail ?? 67) / 100.0)
 
       const glowIntensityLoc = gl.getUniformLocation(program, 'u_glowIntensity')
-      if (glowIntensityLoc) gl.uniform1f(glowIntensityLoc, config.glow_intensity ?? 1.0)
+      if (glowIntensityLoc) gl.uniform1f(glowIntensityLoc, config.multiplier ? config.multiplier / 10.0 : 1.0)
 
       // Flame
       const intensityLoc = gl.getUniformLocation(program, 'u_intensity')
       if (intensityLoc) gl.uniform1f(intensityLoc, config.intensity ?? 1.0)
 
       const wobbleLoc = gl.getUniformLocation(program, 'u_wobble')
-      if (wobbleLoc) gl.uniform1f(wobbleLoc, config.wobble ?? 0.5)
+      if (wobbleLoc) gl.uniform1f(wobbleLoc, config.velocity ?? 0.3)
 
       const lowColorLoc = gl.getUniformLocation(program, 'u_lowColor')
       if (lowColorLoc) {
-        const lowColor = hexToRgb(config.low_color ?? '#FF4400')
+        const lowColor = hexToRgb(config.low_band ?? config.low_color ?? '#FF4400')
         gl.uniform3f(lowColorLoc, ...lowColor)
       }
 
       const midColorLoc = gl.getUniformLocation(program, 'u_midColor')
       if (midColorLoc) {
-        const midColor = hexToRgb(config.mid_color ?? '#FFAA00')
+        const midColor = hexToRgb(config.mid_band ?? config.mid_color ?? '#FFAA00')
         gl.uniform3f(midColorLoc, ...midColor)
       }
 
       const highColorLoc = gl.getUniformLocation(program, 'u_highColor')
       if (highColorLoc) {
-        const highColor = hexToRgb(config.high_color ?? '#FFFF00')
+        const highColor = hexToRgb(config.high_band ?? config.high_color ?? '#FFFF00')
         gl.uniform3f(highColorLoc, ...highColor)
       }
 
@@ -1021,19 +1024,19 @@ export const WebGLVisualiser = ({
 
       // Equalizer
       const bandsLoc = gl.getUniformLocation(program, 'u_bands')
-      if (bandsLoc) gl.uniform1f(bandsLoc, config.bands ?? 32.0)
+      if (bandsLoc) gl.uniform1f(bandsLoc, config.bands ?? 16.0)
 
       const ringModeLoc = gl.getUniformLocation(program, 'u_ringMode')
-      if (ringModeLoc) gl.uniform1f(ringModeLoc, config.ring_mode ? 1.0 : 0.0)
+      if (ringModeLoc) gl.uniform1f(ringModeLoc, (config.ring || config.ring_mode) ? 1.0 : 0.0)
 
       const centerModeLoc = gl.getUniformLocation(program, 'u_centerMode')
-      if (centerModeLoc) gl.uniform1f(centerModeLoc, config.center_mode ? 1.0 : 0.0)
+      if (centerModeLoc) gl.uniform1f(centerModeLoc, (config.center || config.center_mode) ? 1.0 : 0.0)
 
       const spinLoc = gl.getUniformLocation(program, 'u_spin')
       if (spinLoc) {
         // Accumulate spin based on bass
-        if (config.spin_enabled) {
-          beatRef.current += bass * 0.05
+        if (config.spin || config.spin_enabled) {
+          beatRef.current += bass * (config.spin_multiplier ?? 1.0) * 0.05
         }
         gl.uniform1f(spinLoc, beatRef.current)
       }
@@ -1072,30 +1075,49 @@ export const WebGLVisualiser = ({
 
       // Noise
       const zoomLoc = gl.getUniformLocation(program, 'u_zoom')
-      if (zoomLoc) gl.uniform1f(zoomLoc, config.zoom ?? 3.0)
+      if (zoomLoc) gl.uniform1f(zoomLoc, config.zoom ?? config.stretch ?? 3.0)
 
       const audioZoomLoc = gl.getUniformLocation(program, 'u_audioZoom')
-      if (audioZoomLoc) gl.uniform1f(audioZoomLoc, config.audio_zoom ?? 1.0)
+      if (audioZoomLoc) gl.uniform1f(audioZoomLoc, config.multiplier ?? config.audio_zoom ?? 1.0)
 
       // Blender
       const blurLoc = gl.getUniformLocation(program, 'u_blur')
-      if (blurLoc) gl.uniform1f(blurLoc, config.blur ?? 0.5)
+      if (blurLoc) gl.uniform1f(blurLoc, config.mask_cutoff ?? config.blur ?? 0.5)
 
       // Clone
       const mirrorsLoc = gl.getUniformLocation(program, 'u_mirrors')
-      if (mirrorsLoc) gl.uniform1f(mirrorsLoc, config.mirrors ?? 2.0)
+      if (mirrorsLoc) gl.uniform1f(mirrorsLoc, config.screen ?? config.mirrors ?? 2.0)
 
       // Bands
       const flipLoc = gl.getUniformLocation(program, 'u_flip')
-      if (flipLoc) gl.uniform1f(flipLoc, config.flip ? 1.0 : 0.0)
+      if (flipLoc) gl.uniform1f(flipLoc, (config.align === 'invert' || config.flip) ? 1.0 : 0.0)
 
       // Blocks
       const blockSizeLoc = gl.getUniformLocation(program, 'u_blockSize')
-      if (blockSizeLoc) gl.uniform1f(blockSizeLoc, config.block_size ?? 10.0)
+      if (blockSizeLoc) gl.uniform1f(blockSizeLoc, config.block_count ?? config.block_size ?? 10.0)
 
       // Keybeat
       const keysLoc = gl.getUniformLocation(program, 'u_keys')
-      if (keysLoc) gl.uniform1f(keysLoc, config.keys ?? 16.0)
+      if (keysLoc) gl.uniform1f(keysLoc, (config.stretch_horizontal / 6.25) || (config.keys ?? 16.0))
+
+      // Texter
+      const texterDensityLoc = gl.getUniformLocation(program, 'u_density')
+      if (texterDensityLoc) gl.uniform1f(texterDensityLoc, (config.height_percent / 10.0) || (config.density ?? 1.0))
+
+      // Radial
+      const radialBandsLoc = gl.getUniformLocation(program, 'u_bands')
+      if (radialBandsLoc && visualType === 'radial') gl.uniform1f(radialBandsLoc, config.edges || config.bands || 32.0)
+
+      // Bands & BandsMatrix
+      const bandsCountLoc = gl.getUniformLocation(program, 'u_bands')
+      if (bandsCountLoc && (visualType === 'bands' || visualType === 'bandsmatrix'))
+        gl.uniform1f(bandsCountLoc, config.band_count || config.bands || 16.0)
+
+      // Waterfall
+      const waterfallBandsLoc = gl.getUniformLocation(program, 'u_bands')
+      if (waterfallBandsLoc && visualType === 'waterfall') gl.uniform1f(waterfallBandsLoc, config.bands || 16.0)
+      const waterfallSpeedLoc = gl.getUniformLocation(program, 'u_speed')
+      if (waterfallSpeedLoc && visualType === 'waterfall') gl.uniform1f(waterfallSpeedLoc, (3.0 / config.drop_secs) || (config.speed ?? 1.0))
 
       // Image effect uniforms
       const bgColorLoc = gl.getUniformLocation(program, 'u_bgColor')

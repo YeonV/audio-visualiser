@@ -98,7 +98,8 @@ const VisualiserIsoInner = (
   const { handleReset, handleResetAll } = useVisualizerReset()
 
   const butterchurnRef = useRef<any>(null)
-  const config = DEFAULT_CONFIGS[visualType] || {}
+  const config = useStore(state => state.visualizerConfigs[visualType]) || DEFAULT_CONFIGS[visualType] || {}
+  const updateVisualizerConfig = useStore(state => state.updateVisualizerConfig)
 
   return (
     <>
@@ -150,7 +151,7 @@ const VisualiserIsoInner = (
                 ppState={ppState}
                 config={config}
                 setConfig={() => {}}
-                handleEffectConfig={() => {}}
+                handleEffectConfig={(update) => updateVisualizerConfig(visualType, update)}
                 ConfigFormComponent={ConfigFormComponent}
                 effects={effects}
               />
