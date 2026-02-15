@@ -103,7 +103,9 @@ export const WebGLVisualiser = ({
   const melbankTextureRef = useRef<WebGLTexture | null>(null)
   const historyTextureRef = useRef<WebGLTexture | null>(null)
   const gradientTextureRef = useRef<WebGLTexture | null>(null)
+  const textTextureRef = useRef<WebGLTexture | null>(null)
   const currentGradientStrRef = useRef<string | null>(null)
+  const currentTextKeyRef = useRef<string | null>(null)
   const animationRef = useRef<number | undefined>(undefined)
   const startTimeRef = useRef<number>(Date.now())
   const previousDataRef = useRef<number[] | Float32Array>([])
@@ -152,6 +154,54 @@ export const WebGLVisualiser = ({
     locationsRef.current[name] = loc
     return loc
   }, [])
+
+  // Helper to handle text texture
+  const handleTextTexture = useCallback((gl: WebGLRenderingContext, cfg: any) => {
+    const text = cfg.text || 'LedFx'
+    const font = cfg.font || 'Press Start 2P'
+    const heightPercent = cfg.height_percent || 100
+    const color = cfg.text_color || '#FFFFFF'
+    const key = `${text}-${font}-${heightPercent}-${color}`
+
+    if (currentTextKeyRef.current !== key) {
+      if (!textTextureRef.current) textTextureRef.current = gl.createTexture()
+
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d')
+      if (ctx) {
+        const fontSize = 128 // High base res
+        ctx.font = `${fontSize}px "${font}", Arial`
+        const metrics = ctx.measureText(text)
+        canvas.width = Math.pow(2, Math.ceil(Math.log2(metrics.width || 1)))
+        canvas.height = Math.pow(2, Math.ceil(Math.log2(fontSize * 1.5)))
+
+        ctx.font = `${fontSize}px "${font}", Arial`
+        ctx.fillStyle = color
+        ctx.textBaseline = 'middle'
+        ctx.textAlign = 'center'
+        ctx.fillText(text, canvas.width / 2, canvas.height / 2)
+
+        gl.activeTexture(gl.TEXTURE2)
+        gl.bindTexture(gl.TEXTURE_2D, textTextureRef.current)
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas)
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+
+        currentTextKeyRef.current = key
+        configRef.current._textAspect = canvas.width / canvas.height
+      }
+    }
+
+    const textLoc = getLoc('u_textTexture')
+    if (textLoc) {
+      gl.activeTexture(gl.TEXTURE2)
+      gl.bindTexture(gl.TEXTURE_2D, textTextureRef.current)
+      gl.uniform1i(textLoc, 2)
+      gl.uniform1f(getLoc('u_textAspect'), configRef.current._textAspect || 1.0)
+    }
+  }, [getLoc])
 
   // Helper to handle gradient uniforms
   const handleGradients = useCallback((gl: WebGLRenderingContext, cfg: any) => {
@@ -756,7 +806,12 @@ export const WebGLVisualiser = ({
       gl.uniform1f(getLoc('u_flip'), (cfg.align === 'invert' || cfg.flip) ? 1.0 : 0.0)
       gl.uniform1f(getLoc('u_blockSize'), cfg.block_count ?? cfg.block_size ?? 10.0)
       gl.uniform1f(getLoc('u_keys'), (cfg.stretch_horizontal / 6.25) || (cfg.keys ?? 16.0))
-      if (currentVisualType === 'texter') gl.uniform1f(getLoc('u_density'), (cfg.height_percent / 10.0) || (cfg.density ?? 1.0))
+      if (currentVisualType === 'texter') {
+        gl.uniform1f(getLoc('u_density'), (cfg.height_percent / 100.0) || 1.0)
+        handleTextTexture(gl, cfg)
+        const effectMap: Record<string, number> = { 'Side Scroll': 0, 'Spokes': 1, 'Carousel': 2, 'Wave': 3, 'Pulse': 4, 'Fade': 5 }
+        gl.uniform1i(getLoc('u_textEffect'), effectMap[cfg.text_effect] ?? 0)
+      }
       if (currentVisualType === 'radial') gl.uniform1f(getLoc('u_bands'), cfg.edges || cfg.bands || 32.0)
       if (currentVisualType === 'bands' || currentVisualType === 'bandsmatrix') gl.uniform1f(getLoc('u_bands'), cfg.band_count || cfg.bands || 16.0)
       if (currentVisualType === 'waterfall') {
@@ -854,6 +909,7 @@ export const WebGLVisualiser = ({
         if (gradientTextureRef.current) glRef.current.deleteTexture(gradientTextureRef.current)
         if (melbankTextureRef.current) glRef.current.deleteTexture(melbankTextureRef.current)
         if (historyTextureRef.current) glRef.current.deleteTexture(historyTextureRef.current)
+        if (textTextureRef.current) glRef.current.deleteTexture(textTextureRef.current)
         gradientTextureRef.current = null
         melbankTextureRef.current = null
         historyTextureRef.current = null

@@ -1691,7 +1691,7 @@ export const keybeat2dShader = `
   }
 `
 
-// Texter Shader - Text/character-based visualization
+// Texter Shader - Actual text-based visualization
 export const texterShader = `
   precision highp float;
 
@@ -1704,84 +1704,79 @@ export const texterShader = `
   uniform float u_beat;
   uniform vec2 u_resolution;
   uniform float u_density;
+
+  uniform sampler2D u_textTexture;
+  uniform float u_textAspect;
+  uniform int u_textEffect; // 0=Side Scroll, 1=Spokes, 2=Carousel, 3=Wave, 4=Pulse, 5=Fade
+
   uniform sampler2D u_gradient;
   uniform bool u_useGradient;
   uniform float u_gradientRoll;
 
   varying vec2 v_position;
 
-  float random(vec2 st) {
-    return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * 43758.5453123);
-  }
-
-  // Better pseudo-character pattern using a 3x5 grid hash
-  float char(vec2 uv, float seed) {
-    vec2 grid = floor(uv * vec2(3.0, 5.0));
-    if (grid.x < 0.0 || grid.x > 2.0 || grid.y < 0.0 || grid.y > 4.0) return 0.0;
-
-    // Hash based on grid position and seed
-    float h = random(grid + seed * 123.456);
-    return step(0.5, h);
-  }
-
   void main() {
-    vec2 uv = v_position * 0.5 + 0.5;
+    vec2 uv = v_position;
+    float time = u_time;
+    float energy = u_bass;
+    float screenAspect = u_resolution.x / u_resolution.y;
 
-    // Density drives the number of characters
-    float cols = 5.0 * u_density;
-    float rows = cols * (u_resolution.y / u_resolution.x);
-    if (u_resolution.x == 0.0) rows = 10.0 * u_density;
+    vec2 textUV;
+    float alpha = 1.0;
 
-    vec2 gridUV = uv * vec2(cols, rows);
-    vec2 gridPos = floor(gridUV);
-    vec2 cellUV = fract(gridUV);
+    // Center and scale by density
+    vec2 p = uv / (u_density * 2.0);
 
-    // Character seed - some change fast, some change slow
-    float charChangeSpeed = random(gridPos) * 5.0 + 2.0;
-    float seed = random(gridPos + floor(u_time * charChangeSpeed));
+    // Adjust for texture aspect ratio vs screen aspect ratio
+    p.y *= screenAspect / u_textAspect;
 
-    // Some cells are empty
-    float active = step(0.3, random(gridPos + 0.123));
-
-    float charPattern = char(cellUV, seed) * active;
-
-    // Scrolling effect
-    float scroll = u_time * (random(vec2(gridPos.x, 0.0)) * 2.0 + 1.0);
-    float rowOffset = floor(scroll);
-
-    // Color
-    vec3 charColor;
-    float hue = fract(gridPos.x / cols + u_time * 0.05);
-
-    if (u_useGradient) {
-       charColor = texture2D(u_gradient, vec2(fract(hue + u_gradientRoll), 0.5)).rgb;
+    // Effect logic
+    if (u_textEffect == 0) {
+      // Side Scroll
+      float scroll = time * 0.5;
+      textUV = p + vec2(0.5 + scroll, 0.5);
+      textUV.x = fract(textUV.x);
+    } else if (u_textEffect == 3) {
+      // Wave
+      float wave = sin(uv.x * 2.0 + time * 3.0) * 0.2 * energy;
+      textUV = p + vec2(0.5, 0.5 + wave);
+    } else if (u_textEffect == 4) {
+      // Pulse
+      float pulse = 1.0 + energy * 0.5;
+      textUV = (p / pulse) + 0.5;
     } else {
-       charColor = mix(u_primaryColor, u_secondaryColor, sin(hue * 6.28) * 0.5 + 0.5);
+      // Default / Static center
+      textUV = p + 0.5;
     }
 
-    // Audio brightness
-    float audioIntensity = 0.0;
-    float colFrac = gridPos.x / cols;
-    if (colFrac < 0.33) audioIntensity = u_bass;
-    else if (colFrac < 0.66) audioIntensity = u_mid;
-    else audioIntensity = u_high;
+    // Border check
+    if (textUV.x < 0.0 || textUV.x > 1.0 || textUV.y < 0.0 || textUV.y > 1.0) {
+       gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+       return;
+    }
 
-    float brightness = 0.2 + audioIntensity * 0.8;
+    // Sample text
+    vec4 tex = texture2D(u_textTexture, textUV);
 
-    // Add glowing head effect for each column (like matrix)
-    float colScroll = u_time * (random(vec2(gridPos.x, 0.7)) * 3.0 + 1.0);
-    float head = fract(uv.y + colScroll);
-    brightness += exp(-head * 10.0) * 0.5;
+    // Color
+    vec3 color;
+    if (u_useGradient) {
+      color = texture2D(u_gradient, vec2(fract(uv.x * 0.5 + 0.5 + u_gradientRoll), 0.5)).rgb;
+    } else {
+      color = mix(u_primaryColor, u_secondaryColor, uv.x * 0.5 + 0.5);
+    }
 
-    vec3 color = charColor * charPattern * brightness;
+    // Final color modulated by text alpha and audio
+    // Text color is baked into texture usually, but we can override
+    vec3 finalColor = mix(vec3(0.0), color, tex.a);
+
+    // Glow effect
+    finalColor += color * tex.a * energy * 0.5;
 
     // Beat flash
-    color += charColor * charPattern * u_beat * 0.5;
+    finalColor *= 1.0 + u_beat * 0.3;
 
-    // Subtle background
-    color += charColor * 0.05 * active;
-
-    gl_FragColor = vec4(color, 1.0);
+    gl_FragColor = vec4(finalColor, 1.0);
   }
 `
 
