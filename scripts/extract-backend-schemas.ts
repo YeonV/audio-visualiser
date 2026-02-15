@@ -203,42 +203,96 @@ function parsePythonEffect(content: string, effectName: string): EffectSchema {
   let hiddenKeys: string[] = []
   let advancedKeys: string[] = []
 
-  // Extract HIDDEN_KEYS
-  const hiddenKeysMatch = content.match(/HIDDEN_KEYS\s*=\s*.*?\[([^\]]+)\]/s)
-  if (hiddenKeysMatch) {
-    hiddenKeys = hiddenKeysMatch[1]
+  // Helper to extract keys from assignments like HIDDEN_KEYS = ... + ["a", "b"]
+  const extractKeys = (pattern: RegExp): string[] => {
+    const match = content.match(pattern)
+    if (!match) return []
+    const bracketsContent = match[1]
+    return bracketsContent
       .split(',')
       .map(k => k.trim().replace(/['"]/g, ''))
       .filter(k => k && k !== '...')
   }
 
-  // Extract ADVANCED_KEYS
-  const advancedKeysMatch = content.match(/ADVANCED_KEYS\s*=\s*.*?\[([^\]]+)\]/s)
-  if (advancedKeysMatch) {
-    advancedKeys = advancedKeysMatch[1]
-      .split(',')
-      .map(k => k.trim().replace(/['"]/g, ''))
-      .filter(k => k && k !== '...')
+  hiddenKeys = extractKeys(/HIDDEN_KEYS\s*=\s*[^[\]]*\[([\s\S]*?)\]/)
+  advancedKeys = extractKeys(/ADVANCED_KEYS\s*=\s*[^[\]]*\[([\s\S]*?)\]/)
+
+  // Add base class keys if referenced
+  if (content.includes('Twod.HIDDEN_KEYS')) {
+    hiddenKeys.push('mirror', 'flip', 'blur', 'dump')
+  }
+  if (content.includes('AudioReactiveEffect.ADVANCED_KEYS')) {
+    advancedKeys.push('frequency_range')
+  }
+  if (content.includes('Twod.ADVANCED_KEYS')) {
+    advancedKeys.push('dump', 'test', 'flip_horizontal', 'flip_vertical', 'background_mode')
   }
 
   // Extract CONFIG_SCHEMA fields
-  // Improved regex to capture the full validator even if it contains commas (e.g., inside vol.All/vol.Range)
-  // It matches until the next vol.Optional, vol.Required or the end of the schema definition.
-  const optionalRegex = /vol\.Optional\s*\(\s*["']([^"']+)["']\s*,\s*description\s*=\s*["']([^"']*)["']\s*(?:,\s*default\s*=\s*([\s\S]*?))?\s*\)\s*:\s*([\s\S]*?)(?=,\s*vol\.Optional|,\s*vol\.Required|(?:\s*\n\s*\})|$)/gs
+  // Support both vol.Optional and vol.Required
+  const fieldRegex = /vol\.(Optional|Required)\s*\(\s*["']([^"']+)["']\s*(?:,\s*description\s*=\s*["']([^"']*)["'])?\s*(?:,\s*default\s*=\s*([\s\S]*?))?\s*\)\s*:\s*([\s\S]*?)(?=,\s*vol\.(?:Optional|Required)|(?:\s*\n\s*\})|$)/gs
 
   let match
-  while ((match = optionalRegex.exec(content)) !== null) {
-    let [ , id, description, defaultValue, validator ] = match
+  while ((match = fieldRegex.exec(content)) !== null) {
+    let [ , , id, description, defaultValue, validator ] = match
     
     // Clean up trailing commas from defaultValue and validator
     if (defaultValue) defaultValue = defaultValue.trim().replace(/,$/, '').trim()
     if (validator) validator = validator.trim().replace(/,$/, '').trim()
 
     // Parse validator to determine type and constraints
-    const field = parseValidator(id, description, defaultValue, validator)
+    const field = parseValidator(id, description || '', defaultValue, validator)
     if (field) {
       fields.push(field)
       defaults[id] = field.default
+    }
+  }
+
+  // Inject inherited fields from base classes if they are not redefined
+  const inheritedFields: SchemaField[] = []
+
+  if (content.includes('GradientEffect')) {
+    inheritedFields.push(
+      {
+        id: 'gradient',
+        title: 'Gradient',
+        type: 'color',
+        gradient: true,
+        default: 'linear-gradient(90deg, rgb(255, 0, 0) 0%, rgb(255, 120, 0) 14%, rgb(255, 200, 0) 28%, rgb(0, 255, 0) 42%, rgb(0, 199, 140) 56%, rgb(0, 0, 255) 70%, rgb(128, 0, 128) 84%, rgb(255, 0, 178) 98%)',
+        description: 'Color gradient to display'
+      },
+      {
+        id: 'gradient_roll',
+        title: 'Gradient Roll',
+        type: 'number',
+        default: 0,
+        min: 0,
+        max: 10,
+        step: 0.1,
+        description: 'Amount to shift the gradient'
+      }
+    )
+  }
+
+  if (content.includes('Twod')) {
+    inheritedFields.push(
+      { id: 'flip_horizontal', title: 'Flip Horizontal', type: 'boolean', default: false, description: 'Flip image horizontally' },
+      { id: 'flip_vertical', title: 'Flip Vertical', type: 'boolean', default: false, description: 'Flip image vertically' },
+      { id: 'rotate', title: 'Rotate', type: 'integer', default: 0, min: 0, max: 3, step: 1, description: '90 Degree rotations' },
+      { id: 'background_mode', title: 'Background Mode', type: 'string', default: 'additive', description: 'Background blending mode' }
+    )
+  }
+
+  // Common Effect fields often desired in UI
+  inheritedFields.push(
+    { id: 'brightness', title: 'Brightness', type: 'number', default: 1.0, min: 0, max: 1.0, step: 0.01 },
+    { id: 'blur', title: 'Blur', type: 'number', default: 0.0, min: 0, max: 10, step: 0.1 }
+  )
+
+  for (const f of inheritedFields) {
+    if (!fields.find(existing => existing.id === f.id)) {
+      fields.push(f)
+      defaults[f.id] = f.default
     }
   }
 
