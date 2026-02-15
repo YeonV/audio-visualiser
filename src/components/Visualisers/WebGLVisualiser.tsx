@@ -719,6 +719,8 @@ export const WebGLVisualiser = ({
       const lcLoc = getLoc('u_lowColor'); if (lcLoc) { const c = hexToRgb(cfg.low_band ?? cfg.low_color ?? '#FF4400'); gl.uniform3f(lcLoc, c[0], c[1], c[2]) }
       const mcLoc = getLoc('u_midColor'); if (mcLoc) { const c = hexToRgb(cfg.mid_band ?? cfg.mid_color ?? '#FFAA00'); gl.uniform3f(mcLoc, c[0], c[1], c[2]) }
       const hcLoc = getLoc('u_highColor'); if (hcLoc) { const c = hexToRgb(cfg.high_band ?? cfg.high_color ?? '#FFFF00'); gl.uniform3f(hcLoc, c[0], c[1], c[2]) }
+      gl.uniform1f(getLoc('u_intensity'), cfg.intensity ?? 1.0)
+      gl.uniform1f(getLoc('u_wobble'), cfg.wobble ?? 0.1)
 
       // Plasma
       gl.uniform1f(getLoc('u_twist'), cfg.twist ?? 0.1)

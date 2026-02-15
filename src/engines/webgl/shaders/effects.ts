@@ -933,9 +933,19 @@ export const flameShader = `
 
     // Combine colors
     vec3 color = vec3(0.0);
-    color += u_lowColor * flame * (0.5 + u_bass);
-    color += u_midColor * flameMid;
-    color += u_highColor * flameHigh;
+    vec3 lowColor = u_lowColor;
+    vec3 midColor = u_midColor;
+    vec3 highColor = u_highColor;
+
+    if (u_useGradient) {
+      lowColor = texture2D(u_gradient, vec2(fract(0.0 + u_gradientRoll), 0.5)).rgb;
+      midColor = texture2D(u_gradient, vec2(fract(0.5 + u_gradientRoll), 0.5)).rgb;
+      highColor = texture2D(u_gradient, vec2(fract(1.0 + u_gradientRoll), 0.5)).rgb;
+    }
+
+    color += lowColor * flame * (0.5 + u_bass);
+    color += midColor * flameMid;
+    color += highColor * flameHigh;
 
     // Inner glow (hottest part)
     float inner = flame * flameMid * flameHigh;
@@ -1694,6 +1704,9 @@ export const texterShader = `
   uniform float u_beat;
   uniform vec2 u_resolution;
   uniform float u_density;
+  uniform sampler2D u_gradient;
+  uniform bool u_useGradient;
+  uniform float u_gradientRoll;
 
   varying vec2 v_position;
 
@@ -1701,60 +1714,72 @@ export const texterShader = `
     return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * 43758.5453123);
   }
 
-  // Simple pseudo-character pattern
+  // Better pseudo-character pattern using a 3x5 grid hash
   float char(vec2 uv, float seed) {
-    float pattern = 0.0;
+    vec2 grid = floor(uv * vec2(3.0, 5.0));
+    if (grid.x < 0.0 || grid.x > 2.0 || grid.y < 0.0 || grid.y > 4.0) return 0.0;
 
-    // Horizontal bars
-    if (seed < 0.25) {
-      pattern = step(0.4, uv.y) * step(uv.y, 0.6);
-    }
-    // Vertical bars
-    else if (seed < 0.5) {
-      pattern = step(0.4, uv.x) * step(uv.x, 0.6);
-    }
-    // Cross
-    else if (seed < 0.75) {
-      pattern = step(0.4, uv.x) * step(uv.x, 0.6);
-      pattern += step(0.4, uv.y) * step(uv.y, 0.6);
-      pattern = min(pattern, 1.0);
-    }
-    // Dot
-    else {
-      pattern = step(length(uv - 0.5), 0.2);
-    }
-
-    return pattern;
+    // Hash based on grid position and seed
+    float h = random(grid + seed * 123.456);
+    return step(0.5, h);
   }
 
   void main() {
     vec2 uv = v_position * 0.5 + 0.5;
 
-    float cols = 20.0 * u_density;
-    float rows = 10.0 * u_density;
+    // Density drives the number of characters
+    float cols = 5.0 * u_density;
+    float rows = cols * (u_resolution.y / u_resolution.x);
+    if (u_resolution.x == 0.0) rows = 10.0 * u_density;
 
-    vec2 gridPos = floor(vec2(uv.x * cols, uv.y * rows));
-    vec2 cellUV = fract(vec2(uv.x * cols, uv.y * rows));
+    vec2 gridUV = uv * vec2(cols, rows);
+    vec2 gridPos = floor(gridUV);
+    vec2 cellUV = fract(gridUV);
 
-    // Character seed (changes over time)
-    float seed = random(gridPos + floor(u_time * 5.0));
-    float charPattern = char(cellUV, seed);
+    // Character seed - some change fast, some change slow
+    float charChangeSpeed = random(gridPos) * 5.0 + 2.0;
+    float seed = random(gridPos + floor(u_time * charChangeSpeed));
+
+    // Some cells are empty
+    float active = step(0.3, random(gridPos + 0.123));
+
+    float charPattern = char(cellUV, seed) * active;
+
+    // Scrolling effect
+    float scroll = u_time * (random(vec2(gridPos.x, 0.0)) * 2.0 + 1.0);
+    float rowOffset = floor(scroll);
 
     // Color
-    float hue = fract(gridPos.x / cols + u_time * 0.1);
-    vec3 charColor = mix(u_primaryColor, u_secondaryColor, sin(hue * 6.28) * 0.5 + 0.5);
+    vec3 charColor;
+    float hue = fract(gridPos.x / cols + u_time * 0.05);
+
+    if (u_useGradient) {
+       charColor = texture2D(u_gradient, vec2(fract(hue + u_gradientRoll), 0.5)).rgb;
+    } else {
+       charColor = mix(u_primaryColor, u_secondaryColor, sin(hue * 6.28) * 0.5 + 0.5);
+    }
 
     // Audio brightness
-    float brightness = 0.3;
-    float cellFrac = (gridPos.x + gridPos.y * cols) / (cols * rows);
-    if (cellFrac < 0.33) brightness += u_bass * 0.7;
-    else if (cellFrac < 0.66) brightness += u_mid * 0.7;
-    else brightness += u_high * 0.7;
+    float audioIntensity = 0.0;
+    float colFrac = gridPos.x / cols;
+    if (colFrac < 0.33) audioIntensity = u_bass;
+    else if (colFrac < 0.66) audioIntensity = u_mid;
+    else audioIntensity = u_high;
+
+    float brightness = 0.2 + audioIntensity * 0.8;
+
+    // Add glowing head effect for each column (like matrix)
+    float colScroll = u_time * (random(vec2(gridPos.x, 0.7)) * 3.0 + 1.0);
+    float head = fract(uv.y + colScroll);
+    brightness += exp(-head * 10.0) * 0.5;
 
     vec3 color = charColor * charPattern * brightness;
 
     // Beat flash
-    color += charColor * charPattern * u_beat * 0.3;
+    color += charColor * charPattern * u_beat * 0.5;
+
+    // Subtle background
+    color += charColor * 0.05 * active;
 
     gl_FragColor = vec4(color, 1.0);
   }
