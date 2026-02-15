@@ -738,7 +738,11 @@ export const WebGLVisualiser = ({
         else beatRef.current += avg * sensitivity * 0.1
         gl.uniform1f(beatLoc, beatRef.current)
       }
-      gl.uniform1f(getLoc('u_rotate'), rotation)
+      // Rotate: if max is 360, it's degrees, if max is 3, it's 90deg steps
+      const rotateValue = cfg.rotate ?? 0
+      const radians = rotateValue <= 4 ? rotateValue * Math.PI / 2 : rotateValue * Math.PI / 180
+      gl.uniform1f(getLoc('u_rotate'), radians)
+
       gl.uniform1i(getLoc('u_flipH'), cfg.flip_horizontal ? 1 : 0)
       gl.uniform1i(getLoc('u_flipV'), cfg.flip_vertical ? 1 : 0)
       gl.uniform1f(getLoc('u_brightness'), brightness)
@@ -809,7 +813,8 @@ export const WebGLVisualiser = ({
       gl.uniform1f(getLoc('u_blockSize'), cfg.block_count ?? cfg.block_size ?? 10.0)
       gl.uniform1f(getLoc('u_keys'), (cfg.stretch_horizontal / 6.25) || (cfg.keys ?? 16.0))
       if (currentVisualType === 'texter') {
-        gl.uniform1f(getLoc('u_density'), (cfg.height_percent / 100.0) || 1.0)
+        gl.uniform1f(getLoc('u_heightPercent'), (cfg.height_percent / 100.0) || 1.0)
+        gl.uniform1f(getLoc('u_widthPercent'), (cfg.width_percent / 100.0) || 1.0)
         handleTextTexture(gl, cfg)
         const effectMap: Record<string, number> = { 'Side Scroll': 0, 'Spokes': 1, 'Carousel': 2, 'Wave': 3, 'Pulse': 4, 'Fade': 5 }
         gl.uniform1i(getLoc('u_textEffect'), effectMap[cfg.text_effect] ?? 0)

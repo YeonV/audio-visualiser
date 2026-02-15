@@ -85,6 +85,19 @@ function generateUISchema(schema: VisualizerSchema): string {
   // Filter out hidden properties
   const visibleProps = Object.entries(schema.properties)
     .filter(([_, prop]) => !prop.ui?.hidden)
+
+  // Sort properties according to requirement
+  visibleProps.sort((a, b) => {
+    const getOrder = (p: SchemaProperty) => {
+      if ((p as any).format === 'color' || (p as any).isGradient) return 1
+      if (p.type === 'number' || p.type === 'integer') return 2
+      if ((p as any).enum) return 3
+      if (p.type === 'string') return 4
+      if (p.type === 'boolean') return 5
+      return 6
+    }
+    return getOrder(a[1]) - getOrder(b[1])
+  })
   
   // Generate properties object
   const properties = visibleProps.map(([key, prop]) => {

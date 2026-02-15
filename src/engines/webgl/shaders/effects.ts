@@ -1738,8 +1738,10 @@ export const texterShader = `
     vec2 textUV;
     float alpha = 1.0;
 
-    // Center and scale by density
-    vec2 p = uv / (u_density * 2.0);
+    // Center and scale
+    vec2 p = uv;
+    p.x /= (u_widthPercent * 2.0);
+    p.y /= (u_heightPercent * 2.0);
 
     // Adjust for texture aspect ratio vs screen aspect ratio
     p.y *= screenAspect / u_textAspect;

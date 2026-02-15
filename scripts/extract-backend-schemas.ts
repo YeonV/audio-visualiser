@@ -297,16 +297,6 @@ function parsePythonEffect(content: string, effectName: string): EffectSchema {
     }
   }
 
-  // Add developer_mode if not present (common to all effects)
-  if (!fields.find(f => f.id === 'developer_mode')) {
-    fields.push({
-      id: 'developer_mode',
-      title: 'Developer Mode',
-      type: 'boolean',
-      default: false
-    })
-    defaults.developer_mode = false
-  }
 
   return {
     name: effectName,
@@ -374,7 +364,7 @@ function parseValidator(id: string, description: string, defaultValue: string | 
     } else if (validator.includes('TEXT_EFFECT_MAPPING')) {
       field.enum = ["Side Scroll", "Spokes", "Carousel", "Wave", "Pulse", "Fade"]
     } else if (validator.includes('FONT_MAPPINGS')) {
-      field.enum = ["Press Start 2P", "Arial", "Courier New"]
+      field.enum = ["Press Start 2P", "Blade-5x8", "8bitOperatorPlus8-Regular", "Roboto-Black", "Roboto-Bold", "Roboto-Regular", "Stop", "technique"]
     } else if (validator.includes('ResizeMethods')) {
       field.enum = ["Fastest", "Fast", "Slow"]
     }
@@ -433,8 +423,28 @@ export const VISUALISER_SCHEMAS: Record<string, VisualizerSchema> = {\n`
 
     // UI Tweaks for specific effects
     if (key === 'texter') {
-      schema.hiddenKeys.push('option_1', 'option_2', 'value_option_1', 'resize_method', 'deep_diag', 'background_mode', 'blur')
+      schema.hiddenKeys.push('alpha', 'text_color', 'use_gradient', 'option_1', 'option_2', 'value_option_1', 'resize_method', 'deep_diag', 'background_mode', 'blur')
       schema.advancedKeys.push('impulse_decay', 'multiplier', 'speed_option_1', 'gradient_roll')
+
+      // Add width_percent field
+      schema.fields.push({
+        id: 'width_percent',
+        title: 'Width Percent',
+        type: 'integer',
+        default: 100,
+        min: 10,
+        max: 200,
+        step: 1
+      })
+      schema.defaults.width_percent = 100
+
+      // Update rotate to 360
+      const rotateField = schema.fields.find(f => f.id === 'rotate')
+      if (rotateField) {
+        rotateField.max = 360
+        rotateField.step = 1
+        rotateField.title = 'Rotate (Deg)'
+      }
     }
 
     output += `  "${key}": {\n`
