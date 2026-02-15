@@ -25,6 +25,7 @@ export interface BaseProperty {
   title: string
   description?: string
   default: any
+  step?: number
   ui?: UIOptions
 }
 
