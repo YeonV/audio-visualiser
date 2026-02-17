@@ -83,9 +83,11 @@ const VisualiserIsoInner = (
 
   const handleTypeChange = useCallback(
     (type: VisualisationType) => {
-      setVisualType(type)
-      setActiveCustomShader(undefined)
-      setShowCode(false)
+      if (type !== useStore.getState().visualType) {
+        setVisualType(type)
+        setActiveCustomShader(undefined)
+        setShowCode(false)
+      }
     },
     [setVisualType, setActiveCustomShader, setShowCode]
   )
@@ -100,6 +102,9 @@ const VisualiserIsoInner = (
   const butterchurnRef = useRef<any>(null)
   const config = useStore(state => state.visualizerConfigs[visualType]) || DEFAULT_CONFIGS[visualType] || {}
   const updateVisualizerConfig = useStore(state => state.updateVisualizerConfig)
+  const handleEffectConfig = useCallback((update: any) => {
+    updateVisualizerConfig(visualType, update)
+  }, [visualType, updateVisualizerConfig])
 
   return (
     <>
@@ -151,7 +156,7 @@ const VisualiserIsoInner = (
                 ppState={ppState}
                 config={config}
                 setConfig={() => {}}
-                handleEffectConfig={(update) => updateVisualizerConfig(visualType, update)}
+                handleEffectConfig={handleEffectConfig}
                 ConfigFormComponent={ConfigFormComponent}
                 effects={effects}
               />

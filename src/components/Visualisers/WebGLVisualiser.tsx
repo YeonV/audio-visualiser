@@ -117,6 +117,7 @@ export const WebGLVisualiser = ({
   const isDrawingRef = useRef<boolean>(false)
   const themeColorsRef = useRef({ primary: [0, 0, 0], secondary: [0, 0, 0] })
   const lastFrameTimeRef = useRef<number>(performance.now())
+  const lastContextRef = useRef<WebGLRenderingContext | null>(null)
 
   // Resource management
   const buffersRef = useRef<Map<string, WebGLBuffer>>(new Map())
@@ -416,7 +417,8 @@ export const WebGLVisualiser = ({
     gl.enable(gl.BLEND)
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
 
-    if (onContextCreatedRef.current) {
+    if (onContextCreatedRef.current && lastContextRef.current !== gl) {
+      lastContextRef.current = gl
       onContextCreatedRef.current(gl, canvas)
     }
 
