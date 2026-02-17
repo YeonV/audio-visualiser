@@ -235,6 +235,7 @@ function parsePythonEffect(content: string, effectName: string): EffectSchema {
 
   let match
   while ((match = fieldRegex.exec(content)) !== null) {
+    // eslint-disable-next-line prefer-const
     let [ , , id, description, defaultValue, validator ] = match
     
     // Clean up trailing commas from defaultValue and validator
@@ -279,7 +280,7 @@ function parsePythonEffect(content: string, effectName: string): EffectSchema {
     inheritedFields.push(
       { id: 'flip_horizontal', title: 'Flip Horizontal', type: 'boolean', default: false, description: 'Flip image horizontally' },
       { id: 'flip_vertical', title: 'Flip Vertical', type: 'boolean', default: false, description: 'Flip image vertically' },
-      { id: 'rotate', title: 'Rotate', type: 'integer', default: 0, min: 0, max: 360, step: 1, title: 'Rotate (Deg)', description: 'Rotation in degrees' },
+      { id: 'rotate', title: 'Rotate', type: 'integer', default: 0, min: 0, max: 360, step: 1, description: 'Rotation in degrees' },
       { id: 'background_mode', title: 'Background Mode', type: 'string', default: 'additive', description: 'Background blending mode' }
     )
   }
@@ -423,20 +424,64 @@ export const VISUALISER_SCHEMAS: Record<string, VisualizerSchema> = {\n`
 
     // UI Tweaks for specific effects
     if (key === 'texter') {
-      schema.hiddenKeys.push('alpha', 'text_color', 'use_gradient', 'option_1', 'option_2', 'value_option_1', 'resize_method', 'deep_diag', 'background_mode', 'blur')
+      schema.hiddenKeys.push('alpha', 'text_color', 'use_gradient', 'option_1', 'option_2', 'value_option_1', 'resize_method', 'deep_diag', 'background_mode', 'blur', 'height_percent')
       schema.advancedKeys.push('impulse_decay', 'multiplier', 'speed_option_1', 'gradient_roll')
 
-      // Add width_percent field
-      schema.fields.push({
-        id: 'width_percent',
-        title: 'Width Percent',
-        type: 'integer',
-        default: 100,
-        min: 10,
-        max: 200,
-        step: 1
-      })
-      schema.defaults.width_percent = 100
+      // Add zoom, squeeze_x, squeeze_y, offset_x, offset_y fields for new shader controls (no height_percent)
+      schema.fields = schema.fields.filter(f => f.id !== 'height_percent')
+      schema.fields.push(
+        {
+          id: 'zoom',
+          title: 'Zoom',
+          type: 'number',
+          default: 1.0,
+          min: 0.1,
+          max: 5.0,
+          step: 0.01
+        },
+        {
+          id: 'stretch_x',
+          title: 'Stretch X',
+          type: 'number',
+          default: 1.0,
+          min: 0.1,
+          max: 5.0,
+          step: 0.01
+        },
+        {
+          id: 'stretch_y',
+          title: 'Stretch Y',
+          type: 'number',
+          default: 1.0,
+          min: 0.1,
+          max: 5.0,
+          step: 0.01
+        },
+        {
+          id: 'offset_x',
+          title: 'Offset X',
+          type: 'number',
+          default: 0.0,
+          min: -2.0,
+          max: 2.0,
+          step: 0.01
+        },
+        {
+          id: 'offset_y',
+          title: 'Offset Y',
+          type: 'number',
+          default: 0.0,
+          min: -2.0,
+          max: 2.0,
+          step: 0.01
+        }
+      )
+      schema.defaults.font_size = 240
+      schema.defaults.zoom = 1.0
+      schema.defaults.stretch_x = 1.0
+      schema.defaults.stretch_y = 1.0
+      schema.defaults.offset_x = 0.0
+      schema.defaults.offset_y = 0.0
     }
 
     output += `  "${key}": {\n`

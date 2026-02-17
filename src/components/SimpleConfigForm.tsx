@@ -1,4 +1,4 @@
-import { Box, Slider, Stack, Typography, Checkbox, FormControlLabel, TextField } from '@mui/material'
+import { Box, Slider, Stack, Typography, Checkbox, FormControlLabel, TextField, MenuItem, Select } from '@mui/material'
 
 interface SimpleConfigFormProps {
   config: any
@@ -18,7 +18,26 @@ const SimpleConfigForm = ({ config, onChange, schema }: SimpleConfigFormProps) =
     return (
       <Stack spacing={3}>
         {Object.entries(schema.properties).map(([key, prop]: [string, any]) => {
-          // Skip internal or hidden properties if marked (though getUISchema already filters)
+          // Minimalistic select for enum fields
+          if (prop.enum && Array.isArray(prop.enum)) {
+            return (
+              <Box key={key}>
+                <Typography variant="body2" gutterBottom>{prop.title || key}</Typography>
+                <Select
+                  fullWidth
+                  label={prop.title || key}
+                  value={config[key] ?? prop.default ?? prop.enum[0]}
+                  onChange={(e) => handleChange(key, e.target.value)}
+                  size="small"
+                  variant="outlined"
+                >
+                  {prop.enum.map((option: string) => (
+                    <MenuItem key={option} value={option}>{option}</MenuItem>
+                  ))}
+                </Select>
+              </Box>
+            )
+          }
           if (prop.type === 'number' || prop.type === 'integer') {
             return (
               <Box key={key}>
@@ -39,7 +58,6 @@ const SimpleConfigForm = ({ config, onChange, schema }: SimpleConfigFormProps) =
               </Box>
             )
           }
-
           if (prop.type === 'boolean') {
             return (
               <Box key={key}>
@@ -56,24 +74,22 @@ const SimpleConfigForm = ({ config, onChange, schema }: SimpleConfigFormProps) =
               </Box>
             )
           }
-
-          if (prop.type === 'color') {
-            return (
-              <Box key={key} sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Typography variant="body2" sx={{ minWidth: 100 }}>{prop.title || key}:</Typography>
-                <input
-                  type="color"
-                  value={config[key] ?? prop.default ?? '#000000'}
-                  onChange={(e) => handleChange(key, e.target.value)}
-                  style={{ width: 40, height: 30, cursor: 'pointer', border: 'none', background: 'none' }}
-                />
-                <Typography variant="caption" sx={{ fontFamily: 'monospace' }}>
-                  {config[key] ?? prop.default}
-                </Typography>
-              </Box>
-            )
-          }
-
+          // if (prop.type === 'color') {
+          //   return (
+          //     <Box key={key} sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          //       <Typography variant="body2" sx={{ minWidth: 100 }}>{prop.title || key}:</Typography>
+          //       <input
+          //         type="color"
+          //         value={config[key] ?? prop.default ?? '#000000'}
+          //         onChange={(e) => handleChange(key, e.target.value)}
+          //         style={{ width: 40, height: 30, cursor: 'pointer', border: 'none', background: 'none' }}
+          //       />
+          //       <Typography variant="caption" sx={{ fontFamily: 'monospace' }}>
+          //         {config[key] ?? prop.default}
+          //       </Typography>
+          //     </Box>
+          //   )
+          // }
           if (prop.type === 'string' || prop.type === 'autocomplete') {
              return (
                <Box key={key}>
@@ -89,7 +105,6 @@ const SimpleConfigForm = ({ config, onChange, schema }: SimpleConfigFormProps) =
                </Box>
              )
           }
-
           return null
         })}
       </Stack>

@@ -38,13 +38,14 @@ export {
   bandsMatrixShader,
   blocksShader,
   keybeat2dShader,
-  texterShader,
+  // texterShader,
   plasmaWled2dShader,
   radialShader,
   soapShader,
   waterfallShader,
   imageShader
 } from './effects'
+export { texterShader } from './effects/texterShader'
 
 // Advanced shaders
 export * from './advanced'
