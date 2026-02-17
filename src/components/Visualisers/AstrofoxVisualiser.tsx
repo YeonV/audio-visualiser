@@ -570,6 +570,8 @@ const AstrofoxVisualiser = forwardRef<AstrofoxVisualiserRef, AstrofoxVisualiserP
     // Cache for FFT parsers per-layer (key: layerId, value: parser instance)
     const fftParserCache = useRef<Map<string, FFTParser>>(new Map())
     const waveParserCache = useRef<Map<string, WaveParser>>(new Map())
+    const audioInputArrayRef = useRef<Uint8Array | null>(null)
+    const geometryBufferRef = useRef<{ transformed: Float32Array; projected: Float32Array } | null>(null)
 
     const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null)
     const [layersExpanded, setLayersExpanded] = useState(true)
@@ -946,11 +948,14 @@ const AstrofoxVisualiser = forwardRef<AstrofoxVisualiserRef, AstrofoxVisualiserP
         let inputData: Uint8Array
         if (data instanceof Uint8Array) {
           inputData = data
-        } else if (data instanceof Float32Array) {
-          inputData = new Uint8Array(data.length)
-          for (let i = 0; i < data.length; i++) inputData[i] = Math.round(data[i] * 255)
         } else {
-          inputData = new Uint8Array(data.map(v => Math.round(v * 255)))
+          if (!audioInputArrayRef.current || audioInputArrayRef.current.length !== data.length) {
+            audioInputArrayRef.current = new Uint8Array(data.length)
+          }
+          inputData = audioInputArrayRef.current
+          for (let i = 0; i < data.length; i++) {
+            inputData[i] = Math.round(data[i] * 255)
+          }
         }
         return parser.parseFFT(inputData, targetBins)
       },
@@ -1284,7 +1289,7 @@ const AstrofoxVisualiser = forwardRef<AstrofoxVisualiserRef, AstrofoxVisualiserP
         // Convert percentage to pixels based on canvas size
         const canvasWidth = ctx.canvas.width
         const canvasHeight = ctx.canvas.height
-        let drawWidth = (layer.width / 100) * canvasWidth
+        const drawWidth = (layer.width / 100) * canvasWidth
         let drawHeight = (layer.height / 100) * canvasHeight
 
         // Maintain aspect ratio if enabled
@@ -1589,8 +1594,15 @@ const AstrofoxVisualiser = forwardRef<AstrofoxVisualiserRef, AstrofoxVisualiserP
         const cosZ = Math.cos(rotZ), sinZ = Math.sin(rotZ)
 
         // Transform and project all vertices
-        const transformed: [number, number, number][] = []
-        const projected: [number, number][] = []
+        if (!geometryBufferRef.current || geometryBufferRef.current.transformed.length !== vertices.length * 3) {
+          geometryBufferRef.current = {
+            transformed: new Float32Array(vertices.length * 3),
+            projected: new Float32Array(vertices.length * 2)
+          }
+        }
+        const transformed = geometryBufferRef.current.transformed
+        const projected = geometryBufferRef.current.projected
+
         for (let i = 0; i < vertices.length; i++) {
           const [vx, vy, vz] = vertices[i]
           // Rotate around X
@@ -1602,10 +1614,17 @@ const AstrofoxVisualiser = forwardRef<AstrofoxVisualiserRef, AstrofoxVisualiserP
           // Rotate around Z
           const x3 = x2 * cosZ - y1 * sinZ
           const y3 = x2 * sinZ + y1 * cosZ
-          transformed[i] = [x3, y3, z2]
+
+          const tIdx = i * 3
+          transformed[tIdx] = x3
+          transformed[tIdx + 1] = y3
+          transformed[tIdx + 2] = z2
+
           // Perspective projection
           const scale = 400 / (400 + z2)
-          projected[i] = [x3 * scale, y3 * scale]
+          const pIdx = i * 2
+          projected[pIdx] = x3 * scale
+          projected[pIdx + 1] = y3 * scale
         }
 
         // Light direction (from top-right-front)
@@ -1621,31 +1640,32 @@ const AstrofoxVisualiser = forwardRef<AstrofoxVisualiserRef, AstrofoxVisualiserP
         // Solid rendering with faces
         if (!layer.wireframe && faces.length > 0) {
           // Calculate face data for sorting
-          const faceData: { idx: number; depth: number; normal: [number, number, number] }[] = []
+          const faceData: { idx: number; depth: number; nx: number; ny: number; nz: number }[] = []
 
           for (let i = 0; i < faces.length; i++) {
             const [i0, i1, i2] = faces[i]
-            const v0 = transformed[i0]
-            const v1 = transformed[i1]
-            const v2 = transformed[i2]
-            if (!v0 || !v1 || !v2) continue
+            const v0x = transformed[i0 * 3], v0y = transformed[i0 * 3 + 1], v0z = transformed[i0 * 3 + 2]
+            const v1x = transformed[i1 * 3], v1y = transformed[i1 * 3 + 1], v1z = transformed[i1 * 3 + 2]
+            const v2x = transformed[i2 * 3], v2y = transformed[i2 * 3 + 1], v2z = transformed[i2 * 3 + 2]
 
             // Calculate face normal (cross product)
-            const ax = v1[0] - v0[0], ay = v1[1] - v0[1], az = v1[2] - v0[2]
-            const bx = v2[0] - v0[0], by = v2[1] - v0[1], bz = v2[2] - v0[2]
+            const ax = v1x - v0x, ay = v1y - v0y, az = v1z - v0z
+            const bx = v2x - v0x, by = v2y - v0y, bz = v2z - v0z
             const nx = ay * bz - az * by
             const ny = az * bx - ax * bz
             const nz = ax * by - ay * bx
             const nLen = Math.sqrt(nx * nx + ny * ny + nz * nz)
-            const normal: [number, number, number] = nLen > 0 ? [nx / nLen, ny / nLen, nz / nLen] : [0, 0, 1]
+            const fnx = nLen > 0 ? nx / nLen : 0
+            const fny = nLen > 0 ? ny / nLen : 0
+            const fnz = nLen > 0 ? nz / nLen : 1
 
             // Backface culling - skip faces pointing away
-            if (normal[2] < 0) continue
+            if (fnz < 0) continue
 
             // Average depth for sorting
-            const depth = (v0[2] + v1[2] + v2[2]) / 3
+            const depth = (v0z + v1z + v2z) / 3
 
-            faceData.push({ idx: i, depth, normal })
+            faceData.push({ idx: i, depth, nx: fnx, ny: fny, nz: fnz })
           }
 
           // Sort faces by depth (far to near)
@@ -1654,14 +1674,13 @@ const AstrofoxVisualiser = forwardRef<AstrofoxVisualiserRef, AstrofoxVisualiserP
           // Render faces
           for (const face of faceData) {
             const [i0, i1, i2] = faces[face.idx]
-            const p0 = projected[i0]
-            const p1 = projected[i1]
-            const p2 = projected[i2]
-            if (!p0 || !p1 || !p2) continue
+            const p0x = projected[i0 * 2], p0y = projected[i0 * 2 + 1]
+            const p1x = projected[i1 * 2], p1y = projected[i1 * 2 + 1]
+            const p2x = projected[i2 * 2], p2y = projected[i2 * 2 + 1]
 
             // Calculate lighting based on material type
             let intensity = 0.3 // Ambient
-            const [nx, ny, nz] = face.normal
+            const { nx, ny, nz } = face
             const diffuse = Math.max(0, nx * lightDir[0] + ny * lightDir[1] + nz * lightDir[2])
 
             switch (layer.material) {
@@ -1699,9 +1718,9 @@ const AstrofoxVisualiser = forwardRef<AstrofoxVisualiserRef, AstrofoxVisualiserP
 
             // Draw filled triangle
             ctx.beginPath()
-            ctx.moveTo(p0[0], p0[1])
-            ctx.lineTo(p1[0], p1[1])
-            ctx.lineTo(p2[0], p2[1])
+            ctx.moveTo(p0x, p0y)
+            ctx.lineTo(p1x, p1y)
+            ctx.lineTo(p2x, p2y)
             ctx.closePath()
             ctx.fill()
 
@@ -1719,12 +1738,10 @@ const AstrofoxVisualiser = forwardRef<AstrofoxVisualiserRef, AstrofoxVisualiserP
           ctx.beginPath()
           for (let i = 0; i < edges.length; i++) {
             const [i1, i2] = edges[i]
-            const p1 = projected[i1]
-            const p2 = projected[i2]
-            if (p1 && p2) {
-              ctx.moveTo(p1[0], p1[1])
-              ctx.lineTo(p2[0], p2[1])
-            }
+            const p1x = projected[i1 * 2], p1y = projected[i1 * 2 + 1]
+            const p2x = projected[i2 * 2], p2y = projected[i2 * 2 + 1]
+            ctx.moveTo(p1x, p1y)
+            ctx.lineTo(p2x, p2y)
           }
           ctx.stroke()
         }
@@ -1827,13 +1844,19 @@ const AstrofoxVisualiser = forwardRef<AstrofoxVisualiserRef, AstrofoxVisualiserP
       window.addEventListener('resize', handleResize)
       handleResize()
 
+      const fftCache = fftParserCache.current
+      const waveCache = waveParserCache.current
+      const geomCache = geometryCache.current
+      const imgCache = imageCache.current
+
       return () => {
         window.removeEventListener('resize', handleResize)
         // Clear caches on unmount
-        fftParserCache.current.clear()
-        waveParserCache.current.clear()
-        geometryCache.current.clear()
-        imageCache.current.clear()
+        fftCache.clear()
+        waveCache.clear()
+        geomCache.clear()
+        imgCache.clear()
+        audioInputArrayRef.current = null
       }
     }, [])
 
@@ -1858,7 +1881,6 @@ const AstrofoxVisualiser = forwardRef<AstrofoxVisualiserRef, AstrofoxVisualiserP
     }, [isPlaying])
 
     // --- Render Controls Panel ---
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     const renderLayerControls = () => {
       if (!selectedLayer) {
         return (

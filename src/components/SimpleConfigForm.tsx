@@ -1,3 +1,4 @@
+import { memo, useCallback } from 'react'
 import { Box, Slider, Stack, Typography, Checkbox, FormControlLabel, TextField, MenuItem, Select } from '@mui/material'
 
 interface SimpleConfigFormProps {
@@ -8,10 +9,10 @@ interface SimpleConfigFormProps {
 
 // Simple fallback form for standalone mode
 // Improved to support dynamic schemas if available
-const SimpleConfigForm = ({ config, onChange, schema }: SimpleConfigFormProps) => {
-  const handleChange = (key: string, value: any) => {
+const SimpleConfigForm = memo(({ config, onChange, schema }: SimpleConfigFormProps) => {
+  const handleChange = useCallback((key: string, value: any) => {
     onChange({ [key]: value })
-  }
+  }, [onChange])
 
   // If we have a schema, render a dynamic form
   if (schema && schema.properties) {
@@ -160,6 +161,8 @@ const SimpleConfigForm = ({ config, onChange, schema }: SimpleConfigFormProps) =
       </Box>
     </Stack>
   )
-}
+})
+
+SimpleConfigForm.displayName = 'SimpleConfigForm'
 
 export default SimpleConfigForm

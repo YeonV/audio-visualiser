@@ -155,7 +155,7 @@ const FrequencyRingsVisualiser: React.FC<FrequencyRingsProps> = ({
     timeRef.current += 0.016
 
     // Process audio data
-    const dataArray = Array.isArray(audioData) ? audioData : Array.from(audioData)
+    const dataArray = audioData
     const dataLen = dataArray.length || 1
 
     // Calculate frequency bands

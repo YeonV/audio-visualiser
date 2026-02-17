@@ -284,32 +284,20 @@ export class BloomPass extends ShaderPass {
     this.blurVPass.render(this.blurBuffer1.texture, this.blurBuffer2.framebuffer)
 
     // Step 4: Blend bloom with original
-    // Need to set both textures for blend pass
     const gl = this.gl
-    gl.useProgram((this.blendPass as any).program)
 
-    // Bind original texture to unit 0
-    gl.activeTexture(gl.TEXTURE0)
-    gl.bindTexture(gl.TEXTURE_2D, inputTexture)
-    gl.uniform1i(gl.getUniformLocation((this.blendPass as any).program, 'inputTexture'), 0)
-
-    // Bind bloom texture to unit 1
+    // Bind bloom texture to unit 1 (inputTexture will be bound to unit 0 by ShaderPass.render)
     gl.activeTexture(gl.TEXTURE1)
     gl.bindTexture(gl.TEXTURE_2D, this.blurBuffer2.texture)
-    gl.uniform1i(gl.getUniformLocation((this.blendPass as any).program, 'bloomTexture'), 1)
 
-    // Set blend parameters
-    gl.uniform1f(
-      gl.getUniformLocation((this.blendPass as any).program, 'intensity'),
-      this._intensity
-    )
-    gl.uniform1i(
-      gl.getUniformLocation((this.blendPass as any).program, 'blendMode'),
-      this._blendMode === 'add' ? 0 : 1
-    )
+    this.blendPass.setUniforms({
+      inputTexture: 0,
+      bloomTexture: 1,
+      intensity: this._intensity,
+      blendMode: this._blendMode === 'add' ? 0 : 1
+    })
 
     // Render to output
-    gl.bindFramebuffer(gl.FRAMEBUFFER, this.renderToScreen ? null : outputFramebuffer)
     this.blendPass.render(inputTexture, outputFramebuffer)
   }
 

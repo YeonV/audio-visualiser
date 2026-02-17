@@ -123,6 +123,18 @@ export const WebGLVisualiser = ({
   const quadBufferRef = useRef<WebGLBuffer | null>(null)
   const offscreenCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const smoothedDataArrayRef = useRef<Float32Array | null>(null)
+  const melbankArrayRef = useRef<Uint8Array | null>(null)
+  const textStateRef = useRef({ aspect: 1.0, texW: 0, texH: 0 })
+  const typedArraysRef = useRef<Map<string, any>>(new Map())
+
+  const getTypedArray = useCallback((name: string, length: number, Type: any = Float32Array) => {
+    let arr = typedArraysRef.current.get(name)
+    if (!arr || arr.length !== length) {
+      arr = new Type(length)
+      typedArraysRef.current.set(name, arr)
+    }
+    return arr
+  }, [])
 
   const getBuffer = useCallback((gl: WebGLRenderingContext, name: string) => {
     let buffer = buffersRef.current.get(name)
@@ -214,25 +226,20 @@ export const WebGLVisualiser = ({
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
-        currentTextKeyRef.current = key;
-        configRef.current._textAspect = texW / texH;
-        configRef.current._textTexW = texW;
-        configRef.current._textTexH = texH;
+        textStateRef.current.aspect = texW / texH;
       }
     };
 
     // Only redraw if key or texture width changed
-    if (currentTextKeyRef.current !== key || configRef.current._textTexW !== texW) {
-      // Wait for font to be loaded, then redraw and trigger a main draw
+    if (currentTextKeyRef.current !== key || textStateRef.current.texW !== texW) {
+      currentTextKeyRef.current = key;
+      textStateRef.current.texW = texW;
+      textStateRef.current.texH = texH;
+
+      // Wait for font to be loaded, then redraw
       if (document.fonts && document.fonts.load) {
         document.fonts.load(`${fontSize}px "${font}"`).then(() => {
           drawTextToTexture();
-          // Force a redraw of the main visualiser (if not already animating)
-          if (typeof window !== 'undefined' && typeof requestAnimationFrame === 'function') {
-            requestAnimationFrame(() => {
-              if (typeof draw === 'function') draw();
-            });
-          }
         });
       } else {
         drawTextToTexture();
@@ -244,7 +251,7 @@ export const WebGLVisualiser = ({
       gl.activeTexture(gl.TEXTURE2);
       gl.bindTexture(gl.TEXTURE_2D, textTextureRef.current);
       gl.uniform1i(textLoc, 2);
-      gl.uniform1f(getLoc('u_textAspect'), configRef.current._textAspect || 1.0);
+      gl.uniform1f(getLoc('u_textAspect'), textStateRef.current.aspect);
     }
   }, [getLoc])
 
@@ -447,9 +454,10 @@ export const WebGLVisualiser = ({
 
       const bufferLength = data.length
       const barWidth = width / bufferLength
-      const vertices: number[] = []
-      const amplitudes: number[] = []
-      const indices: number[] = []
+
+      const posArr = getTypedArray('bars3d_pos_arr', bufferLength * 12 * 2)
+      const ampArr = getTypedArray('bars3d_amp_arr', bufferLength * 12)
+      const idxArr = getTypedArray('bars3d_idx_arr', bufferLength * 12)
 
       for (let i = 0; i < bufferLength; i++) {
         const amplitude = Math.min(data[i] * sensitivity * 0.5, 1)
@@ -458,32 +466,44 @@ export const WebGLVisualiser = ({
         const w = barWidth - 2
         const depth = amplitude * 20
 
-        vertices.push(
-          x, height, x + w, height, x + w, height - barHeight,
-          x, height, x + w, height - barHeight, x, height - barHeight
-        )
+        const vOffset = i * 24
+        const aOffset = i * 12
+        const iVal = i / bufferLength
 
-        vertices.push(
-          x, height - barHeight, x + w, height - barHeight, x + w + depth, height - barHeight - depth,
-          x, height - barHeight, x + w + depth, height - barHeight - depth, x + depth, height - barHeight - depth
-        )
+        // Triangle 1
+        posArr[vOffset] = x; posArr[vOffset+1] = height
+        posArr[vOffset+2] = x + w; posArr[vOffset+3] = height
+        posArr[vOffset+4] = x + w; posArr[vOffset+5] = height - barHeight
+        // Triangle 2
+        posArr[vOffset+6] = x; posArr[vOffset+7] = height
+        posArr[vOffset+8] = x + w; posArr[vOffset+9] = height - barHeight
+        posArr[vOffset+10] = x; posArr[vOffset+11] = height - barHeight
+
+        // Triangle 3 (side/depth)
+        posArr[vOffset+12] = x; posArr[vOffset+13] = height - barHeight
+        posArr[vOffset+14] = x + w; posArr[vOffset+15] = height - barHeight
+        posArr[vOffset+16] = x + w + depth; posArr[vOffset+17] = height - barHeight - depth
+        // Triangle 4
+        posArr[vOffset+18] = x; posArr[vOffset+19] = height - barHeight
+        posArr[vOffset+20] = x + w + depth; posArr[vOffset+21] = height - barHeight - depth
+        posArr[vOffset+22] = x + depth; posArr[vOffset+23] = height - barHeight - depth
 
         for (let j = 0; j < 12; j++) {
-          amplitudes.push(amplitude)
-          indices.push(i / bufferLength)
+          ampArr[aOffset + j] = amplitude
+          idxArr[aOffset + j] = iVal
         }
       }
 
       const positionBuffer = getBuffer(gl, 'bars3d_pos')
       gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer)
-      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.DYNAMIC_DRAW)
+      gl.bufferData(gl.ARRAY_BUFFER, posArr, gl.DYNAMIC_DRAW)
       const positionLoc = gl.getAttribLocation(program, 'a_position')
       gl.enableVertexAttribArray(positionLoc)
       gl.vertexAttribPointer(positionLoc, 2, gl.FLOAT, false, 0, 0)
 
       const amplitudeBuffer = getBuffer(gl, 'bars3d_amp')
       gl.bindBuffer(gl.ARRAY_BUFFER, amplitudeBuffer)
-      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(amplitudes), gl.DYNAMIC_DRAW)
+      gl.bufferData(gl.ARRAY_BUFFER, ampArr, gl.DYNAMIC_DRAW)
       const amplitudeLoc = gl.getAttribLocation(program, 'a_amplitude')
       if (amplitudeLoc !== -1) {
         gl.enableVertexAttribArray(amplitudeLoc)
@@ -492,7 +512,7 @@ export const WebGLVisualiser = ({
 
       const indexBuffer = getBuffer(gl, 'bars3d_idx')
       gl.bindBuffer(gl.ARRAY_BUFFER, indexBuffer)
-      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(indices), gl.DYNAMIC_DRAW)
+      gl.bufferData(gl.ARRAY_BUFFER, idxArr, gl.DYNAMIC_DRAW)
       const indexLoc = gl.getAttribLocation(program, 'a_index')
       if (indexLoc !== -1) {
         gl.enableVertexAttribArray(indexLoc)
@@ -509,12 +529,12 @@ export const WebGLVisualiser = ({
 
       handleGradients(gl, cfg)
 
-      gl.drawArrays(gl.TRIANGLES, 0, vertices.length / 2)
+      gl.drawArrays(gl.TRIANGLES, 0, bufferLength * 12)
       gl.disableVertexAttribArray(positionLoc)
       if (amplitudeLoc !== -1) gl.disableVertexAttribArray(amplitudeLoc)
       if (indexLoc !== -1) gl.disableVertexAttribArray(indexLoc)
     },
-    [getLoc, handleGradients]
+    [getLoc, handleGradients, getBuffer, getTypedArray]
   )
 
   // Draw particles
@@ -543,37 +563,61 @@ export const WebGLVisualiser = ({
       }
 
       const dt = 0.016
-      particlesRef.current = particlesRef.current.filter((p) => {
+      const particles = particlesRef.current
+      let activeCount = 0
+      for (let i = 0; i < particles.length; i++) {
+        const p = particles[i]
         p.x += p.vx * 60 * dt
         p.y += p.vy * 60 * dt
         p.vy -= 0.1
         p.life += dt * 0.5
-        return p.life < 1 && p.y > 0 && p.x > 0 && p.x < width
-      })
 
-      if (particlesRef.current.length === 0) return
+        if (p.life < 1 && p.y > 0 && p.x > 0 && p.x < width) {
+          if (activeCount !== i) {
+            particles[activeCount] = p
+          }
+          activeCount++
+        }
+      }
+      if (particles.length !== activeCount) {
+        particles.length = activeCount
+      }
 
-      const positions: number[] = [], velocities: number[] = [], lives: number[] = [], sizes: number[] = [], amplitudes: number[] = [], indices: number[] = []
-      particlesRef.current.forEach((p) => {
-        positions.push(p.x, p.y); velocities.push(p.vx, p.vy); lives.push(p.life); sizes.push(p.size); amplitudes.push(p.amplitude); indices.push(p.index)
-      })
+      if (activeCount === 0) return
 
-      const posBuf = getBuffer(gl, 'part_pos'); gl.bindBuffer(gl.ARRAY_BUFFER, posBuf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.DYNAMIC_DRAW)
+      const posArr = getTypedArray('part_pos_arr', activeCount * 2)
+      const velArr = getTypedArray('part_vel_arr', activeCount * 2)
+      const lifeArr = getTypedArray('part_life_arr', activeCount)
+      const sizeArr = getTypedArray('part_size_arr', activeCount)
+      const ampArr = getTypedArray('part_amp_arr', activeCount)
+      const idxArr = getTypedArray('part_idx_arr', activeCount)
+
+      for (let i = 0; i < activeCount; i++) {
+        const p = particles[i]
+        posArr[i * 2] = p.x; posArr[i * 2 + 1] = p.y
+        velArr[i * 2] = p.vx; velArr[i * 2 + 1] = p.vy
+        lifeArr[i] = p.life
+        sizeArr[i] = p.size
+        ampArr[i] = p.amplitude
+        idxArr[i] = p.index
+      }
+
+      const posBuf = getBuffer(gl, 'part_pos'); gl.bindBuffer(gl.ARRAY_BUFFER, posBuf); gl.bufferData(gl.ARRAY_BUFFER, posArr, gl.DYNAMIC_DRAW)
       const posLoc = gl.getAttribLocation(program, 'a_position'); gl.enableVertexAttribArray(posLoc); gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0)
 
-      const velBuf = getBuffer(gl, 'part_vel'); gl.bindBuffer(gl.ARRAY_BUFFER, velBuf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(velocities), gl.DYNAMIC_DRAW)
+      const velBuf = getBuffer(gl, 'part_vel'); gl.bindBuffer(gl.ARRAY_BUFFER, velBuf); gl.bufferData(gl.ARRAY_BUFFER, velArr, gl.DYNAMIC_DRAW)
       const velLoc = gl.getAttribLocation(program, 'a_velocity'); if (velLoc !== -1) { gl.enableVertexAttribArray(velLoc); gl.vertexAttribPointer(velLoc, 2, gl.FLOAT, false, 0, 0) }
 
-      const lifeBuf = getBuffer(gl, 'part_life'); gl.bindBuffer(gl.ARRAY_BUFFER, lifeBuf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(lives), gl.DYNAMIC_DRAW)
+      const lifeBuf = getBuffer(gl, 'part_life'); gl.bindBuffer(gl.ARRAY_BUFFER, lifeBuf); gl.bufferData(gl.ARRAY_BUFFER, lifeArr, gl.DYNAMIC_DRAW)
       const lifeLoc = gl.getAttribLocation(program, 'a_life'); if (lifeLoc !== -1) { gl.enableVertexAttribArray(lifeLoc); gl.vertexAttribPointer(lifeLoc, 1, gl.FLOAT, false, 0, 0) }
 
-      const sizeBuf = getBuffer(gl, 'part_size'); gl.bindBuffer(gl.ARRAY_BUFFER, sizeBuf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(sizes), gl.DYNAMIC_DRAW)
+      const sizeBuf = getBuffer(gl, 'part_size'); gl.bindBuffer(gl.ARRAY_BUFFER, sizeBuf); gl.bufferData(gl.ARRAY_BUFFER, sizeArr, gl.DYNAMIC_DRAW)
       const sizeLoc = gl.getAttribLocation(program, 'a_size'); if (sizeLoc !== -1) { gl.enableVertexAttribArray(sizeLoc); gl.vertexAttribPointer(sizeLoc, 1, gl.FLOAT, false, 0, 0) }
 
-      const ampBuf = getBuffer(gl, 'part_amp'); gl.bindBuffer(gl.ARRAY_BUFFER, ampBuf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(amplitudes), gl.DYNAMIC_DRAW)
+      const ampBuf = getBuffer(gl, 'part_amp'); gl.bindBuffer(gl.ARRAY_BUFFER, ampBuf); gl.bufferData(gl.ARRAY_BUFFER, ampArr, gl.DYNAMIC_DRAW)
       const ampLoc = gl.getAttribLocation(program, 'a_amplitude'); if (ampLoc !== -1) { gl.enableVertexAttribArray(ampLoc); gl.vertexAttribPointer(ampLoc, 1, gl.FLOAT, false, 0, 0) }
 
-      const idxBuf = getBuffer(gl, 'part_idx'); gl.bindBuffer(gl.ARRAY_BUFFER, idxBuf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(indices), gl.DYNAMIC_DRAW)
+      const idxBuf = getBuffer(gl, 'part_idx'); gl.bindBuffer(gl.ARRAY_BUFFER, idxBuf); gl.bufferData(gl.ARRAY_BUFFER, idxArr, gl.DYNAMIC_DRAW)
       const idxLoc = gl.getAttribLocation(program, 'a_index'); if (idxLoc !== -1) { gl.enableVertexAttribArray(idxLoc); gl.vertexAttribPointer(idxLoc, 1, gl.FLOAT, false, 0, 0) }
 
       gl.uniform2f(getLoc('u_resolution'), width, height)
@@ -589,7 +633,7 @@ export const WebGLVisualiser = ({
       gl.drawArrays(gl.POINTS, 0, particlesRef.current.length)
       gl.disableVertexAttribArray(posLoc); if (velLoc !== -1) gl.disableVertexAttribArray(velLoc); if (lifeLoc !== -1) gl.disableVertexAttribArray(lifeLoc); if (sizeLoc !== -1) gl.disableVertexAttribArray(sizeLoc); if (ampLoc !== -1) gl.disableVertexAttribArray(ampLoc); if (idxLoc !== -1) gl.disableVertexAttribArray(idxLoc)
     },
-    [getLoc, handleGradients]
+    [getLoc, handleGradients, getBuffer, getTypedArray]
   )
 
   // Draw radial visualization
@@ -600,8 +644,11 @@ export const WebGLVisualiser = ({
       const cfg = configRef.current
       const sensitivity = cfg.audioSensitivity ?? cfg.sensitivity ?? cfg.multiplier ?? 1.0
       const centerX = width / 2, centerY = height / 2, baseRadius = Math.min(width, height) / 4
-      const vertices: number[] = [], amplitudes: number[] = [], indices: number[] = []
       const bufferLength = data.length
+
+      const posArr = getTypedArray('radial_pos_arr', bufferLength * 6 * 2)
+      const ampArr = getTypedArray('radial_amp_arr', bufferLength * 6)
+      const idxArr = getTypedArray('radial_idx_arr', bufferLength * 6)
 
       for (let i = 0; i < bufferLength; i++) {
         const amplitude = Math.min(data[i] * sensitivity * 0.5, 1)
@@ -611,17 +658,34 @@ export const WebGLVisualiser = ({
         const x2 = centerX + Math.cos(angle) * outerRadius, y2 = centerY + Math.sin(angle) * outerRadius
         const x3 = centerX + Math.cos(nextAngle) * outerRadius, y3 = centerY + Math.sin(nextAngle) * outerRadius
         const x4 = centerX + Math.cos(nextAngle) * innerRadius, y4 = centerY + Math.sin(nextAngle) * innerRadius
-        vertices.push(x1, y1, x2, y2, x3, y3, x1, y1, x3, y3, x4, y4)
-        for (let j = 0; j < 6; j++) { amplitudes.push(amplitude); indices.push(i / bufferLength) }
+
+        const vOffset = i * 12
+        const aOffset = i * 6
+        const iVal = i / bufferLength
+
+        posArr[vOffset] = x1; posArr[vOffset+1] = y1
+        posArr[vOffset+2] = x2; posArr[vOffset+3] = y2
+        posArr[vOffset+4] = x3; posArr[vOffset+5] = y3
+        posArr[vOffset+6] = x1; posArr[vOffset+7] = y1
+        posArr[vOffset+8] = x3; posArr[vOffset+9] = y3
+        posArr[vOffset+10] = x4; posArr[vOffset+11] = y4
+
+        for (let j = 0; j < 6; j++) {
+          ampArr[aOffset + j] = amplitude
+          idxArr[aOffset + j] = iVal
+        }
       }
 
-      const posBuf = getBuffer(gl, 'radial_pos'); gl.bindBuffer(gl.ARRAY_BUFFER, posBuf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.DYNAMIC_DRAW)
+      const posBuf = getBuffer(gl, 'radial_pos'); gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
+      gl.bufferData(gl.ARRAY_BUFFER, posArr, gl.DYNAMIC_DRAW)
       const posLoc = gl.getAttribLocation(program, 'a_position'); gl.enableVertexAttribArray(posLoc); gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0)
 
-      const ampBuf = getBuffer(gl, 'radial_amp'); gl.bindBuffer(gl.ARRAY_BUFFER, ampBuf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(amplitudes), gl.DYNAMIC_DRAW)
+      const ampBuf = getBuffer(gl, 'radial_amp'); gl.bindBuffer(gl.ARRAY_BUFFER, ampBuf);
+      gl.bufferData(gl.ARRAY_BUFFER, ampArr, gl.DYNAMIC_DRAW)
       const ampLoc = gl.getAttribLocation(program, 'a_amplitude'); if (ampLoc !== -1) { gl.enableVertexAttribArray(ampLoc); gl.vertexAttribPointer(ampLoc, 1, gl.FLOAT, false, 0, 0) }
 
-      const idxBuf = getBuffer(gl, 'radial_idx'); gl.bindBuffer(gl.ARRAY_BUFFER, idxBuf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(indices), gl.DYNAMIC_DRAW)
+      const idxBuf = getBuffer(gl, 'radial_idx'); gl.bindBuffer(gl.ARRAY_BUFFER, idxBuf);
+      gl.bufferData(gl.ARRAY_BUFFER, idxArr, gl.DYNAMIC_DRAW)
       const idxLoc = gl.getAttribLocation(program, 'a_index'); if (idxLoc !== -1) { gl.enableVertexAttribArray(idxLoc); gl.vertexAttribPointer(idxLoc, 1, gl.FLOAT, false, 0, 0) }
 
       gl.uniform2f(getLoc('u_resolution'), width, height)
@@ -634,10 +698,10 @@ export const WebGLVisualiser = ({
 
       handleGradients(gl, cfg)
 
-      gl.drawArrays(gl.TRIANGLES, 0, vertices.length / 2)
+      gl.drawArrays(gl.TRIANGLES, 0, bufferLength * 6)
       gl.disableVertexAttribArray(posLoc); if (ampLoc !== -1) gl.disableVertexAttribArray(ampLoc); if (idxLoc !== -1) gl.disableVertexAttribArray(idxLoc)
     },
-    [getLoc, handleGradients]
+    [getLoc, handleGradients, getBuffer, getTypedArray]
   )
 
   // Draw waveform with 3D effect
@@ -647,23 +711,44 @@ export const WebGLVisualiser = ({
       if (!program) return
       const cfg = configRef.current
       const sensitivity = cfg.audioSensitivity ?? cfg.sensitivity ?? cfg.multiplier ?? 1.0
-      const vertices: number[] = [], amplitudes: number[] = [], indices: number[] = []
       const bufferLength = data.length, sliceWidth = width / bufferLength, centerY = height / 2
+
+      const posArr = getTypedArray('wave_pos_arr', (bufferLength - 1) * 6 * 2)
+      const ampArr = getTypedArray('wave_amp_arr', (bufferLength - 1) * 6)
+      const idxArr = getTypedArray('wave_idx_arr', (bufferLength - 1) * 6)
 
       for (let i = 0; i < bufferLength - 1; i++) {
         const amp1 = data[i] * sensitivity * 0.3, amp2 = data[i + 1] * sensitivity * 0.3
         const x1 = i * sliceWidth, x2 = (i + 1) * sliceWidth, y1 = centerY + (amp1 - 0.5) * height * 0.8
-        vertices.push(x1, centerY, x1, y1, x2, y1, x1, centerY, x2, y1, x2, centerY)
-        for (let j = 0; j < 6; j++) { amplitudes.push((amp1 + amp2) / 2); indices.push(i / bufferLength) }
+
+        const vOffset = i * 12
+        const aOffset = i * 6
+        const iVal = i / bufferLength
+        const avgAmp = (amp1 + amp2) / 2
+
+        posArr[vOffset] = x1; posArr[vOffset+1] = centerY
+        posArr[vOffset+2] = x1; posArr[vOffset+3] = y1
+        posArr[vOffset+4] = x2; posArr[vOffset+5] = y1
+        posArr[vOffset+6] = x1; posArr[vOffset+7] = centerY
+        posArr[vOffset+8] = x2; posArr[vOffset+9] = y1
+        posArr[vOffset+10] = x2; posArr[vOffset+11] = centerY
+
+        for (let j = 0; j < 6; j++) {
+          ampArr[aOffset + j] = avgAmp
+          idxArr[aOffset + j] = iVal
+        }
       }
 
-      const posBuf = getBuffer(gl, 'wave_pos'); gl.bindBuffer(gl.ARRAY_BUFFER, posBuf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.DYNAMIC_DRAW)
+      const posBuf = getBuffer(gl, 'wave_pos'); gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
+      gl.bufferData(gl.ARRAY_BUFFER, posArr, gl.DYNAMIC_DRAW)
       const posLoc = gl.getAttribLocation(program, 'a_position'); gl.enableVertexAttribArray(posLoc); gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0)
 
-      const ampBuf = getBuffer(gl, 'wave_amp'); gl.bindBuffer(gl.ARRAY_BUFFER, ampBuf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(amplitudes), gl.DYNAMIC_DRAW)
+      const ampBuf = getBuffer(gl, 'wave_amp'); gl.bindBuffer(gl.ARRAY_BUFFER, ampBuf);
+      gl.bufferData(gl.ARRAY_BUFFER, ampArr, gl.DYNAMIC_DRAW)
       const ampLoc = gl.getAttribLocation(program, 'a_amplitude'); if (ampLoc !== -1) { gl.enableVertexAttribArray(ampLoc); gl.vertexAttribPointer(ampLoc, 1, gl.FLOAT, false, 0, 0) }
 
-      const idxBuf = getBuffer(gl, 'wave_idx'); gl.bindBuffer(gl.ARRAY_BUFFER, idxBuf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(indices), gl.DYNAMIC_DRAW)
+      const idxBuf = getBuffer(gl, 'wave_idx'); gl.bindBuffer(gl.ARRAY_BUFFER, idxBuf);
+      gl.bufferData(gl.ARRAY_BUFFER, idxArr, gl.DYNAMIC_DRAW)
       const idxLoc = gl.getAttribLocation(program, 'a_index'); if (idxLoc !== -1) { gl.enableVertexAttribArray(idxLoc); gl.vertexAttribPointer(idxLoc, 1, gl.FLOAT, false, 0, 0) }
 
       gl.uniform2f(getLoc('u_resolution'), width, height)
@@ -676,10 +761,10 @@ export const WebGLVisualiser = ({
 
       handleGradients(gl, cfg)
 
-      gl.drawArrays(gl.TRIANGLES, 0, vertices.length / 2)
+      gl.drawArrays(gl.TRIANGLES, 0, (bufferLength - 1) * 6)
       gl.disableVertexAttribArray(posLoc); if (ampLoc !== -1) gl.disableVertexAttribArray(ampLoc); if (idxLoc !== -1) gl.disableVertexAttribArray(idxLoc)
     },
-    [getLoc, handleGradients]
+    [getLoc, handleGradients, getBuffer, getTypedArray]
   )
 
   // Draw Bleep
@@ -699,7 +784,7 @@ export const WebGLVisualiser = ({
 
       if (!historyTextureRef.current) historyTextureRef.current = gl.createTexture()
       gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, historyTextureRef.current)
-      const textureData = new Uint8Array(historyRef.current.length)
+      const textureData = getTypedArray('bleep_hist_arr', historyRef.current.length, Uint8Array)
       for (let i = 0; i < historyRef.current.length; i++) textureData[i] = Math.min(255, Math.max(0, historyRef.current[i] * 255))
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.LUMINANCE, historyRef.current.length, 1, 0, gl.LUMINANCE, gl.UNSIGNED_BYTE, textureData)
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
@@ -718,7 +803,7 @@ export const WebGLVisualiser = ({
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
       gl.disableVertexAttribArray(posLoc)
     },
-    [getLoc, handleGradients]
+    [getLoc, handleGradients, getTypedArray]
   )
 
   // Draw Concentric
@@ -845,7 +930,11 @@ export const WebGLVisualiser = ({
       if (melBankLoc && data.length > 0) {
         if (!melbankTextureRef.current) melbankTextureRef.current = gl.createTexture()
         gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, melbankTextureRef.current)
-        const texData = new Uint8Array(data.length)
+
+        if (!melbankArrayRef.current || melbankArrayRef.current.length !== data.length) {
+          melbankArrayRef.current = new Uint8Array(data.length);
+        }
+        const texData = melbankArrayRef.current;
         for (let i = 0; i < data.length; i++) texData[i] = Math.min(255, Math.max(0, data[i] * 255 * sensitivity))
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.LUMINANCE, data.length, 1, 0, gl.LUMINANCE, gl.UNSIGNED_BYTE, texData)
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
@@ -969,33 +1058,53 @@ export const WebGLVisualiser = ({
 
   // Cleanup on unmount or visual type change
   useEffect(() => {
+    const gl = glRef.current
+    const buffers = buffersRef.current
+    const typedArrays = typedArraysRef.current
+    const gradTexRef = gradientTextureRef
+    const melTexRef = melbankTextureRef
+    const histTexRef = historyTextureRef
+    const textTexRef = textTextureRef
+    const quadBufRef = quadBufferRef
+    const progRef = programRef
+    const gradStrRef = currentGradientStrRef
+    const textKeyRef = currentTextKeyRef
+
     return () => {
-      if (glRef.current) {
-        const gl = glRef.current
-        if (gradientTextureRef.current) gl.deleteTexture(gradientTextureRef.current)
-        if (melbankTextureRef.current) gl.deleteTexture(melbankTextureRef.current)
-        if (historyTextureRef.current) gl.deleteTexture(historyTextureRef.current)
-        if (textTextureRef.current) gl.deleteTexture(textTextureRef.current)
+      if (gl) {
+        const gradTex = gradTexRef.current
+        const melTex = melTexRef.current
+        const histTex = histTexRef.current
+        const textTex = textTexRef.current
+        const quadBuf = quadBufRef.current
+        const program = progRef.current
 
-        buffersRef.current.forEach(buffer => gl.deleteBuffer(buffer))
-        buffersRef.current.clear()
+        if (gradTex) gl.deleteTexture(gradTex)
+        if (melTex) gl.deleteTexture(melTex)
+        if (histTex) gl.deleteTexture(histTex)
+        if (textTex) gl.deleteTexture(textTex)
 
-        if (quadBufferRef.current) {
-          gl.deleteBuffer(quadBufferRef.current)
-          quadBufferRef.current = null
+        buffers.forEach(buffer => gl.deleteBuffer(buffer))
+        buffers.clear()
+
+        if (quadBuf) {
+          gl.deleteBuffer(quadBuf)
         }
 
-        if (programRef.current) {
-          deleteProgramAndShaders(gl, programRef.current)
-          programRef.current = null
+        if (program) {
+          deleteProgramAndShaders(gl, program)
         }
 
-        gradientTextureRef.current = null
-        melbankTextureRef.current = null
-        historyTextureRef.current = null
-        textTextureRef.current = null
-        currentGradientStrRef.current = null
-        currentTextKeyRef.current = null
+        typedArrays.clear()
+
+        gradTexRef.current = null
+        melTexRef.current = null
+        histTexRef.current = null
+        textTexRef.current = null
+        quadBufRef.current = null
+        progRef.current = null
+        gradStrRef.current = null
+        textKeyRef.current = null
       }
     }
   }, [visualType])

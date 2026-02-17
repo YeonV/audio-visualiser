@@ -263,30 +263,17 @@ export class GodRaysPass extends ShaderPass {
     this.radialBlurPass.render(this.extractBuffer.texture, this.blurBuffer.framebuffer)
 
     // Step 3: Blend with original
-    gl.useProgram((this.blendPass as any).program)
-
-    // Bind original texture to unit 0
-    gl.activeTexture(gl.TEXTURE0)
-    gl.bindTexture(gl.TEXTURE_2D, inputTexture)
-    gl.uniform1i(gl.getUniformLocation((this.blendPass as any).program, 'inputTexture'), 0)
-
-    // Bind god rays texture to unit 1
     gl.activeTexture(gl.TEXTURE1)
     gl.bindTexture(gl.TEXTURE_2D, this.blurBuffer.texture)
-    gl.uniform1i(gl.getUniformLocation((this.blendPass as any).program, 'godRaysTexture'), 1)
 
-    // Set blend parameters
-    gl.uniform1f(
-      gl.getUniformLocation((this.blendPass as any).program, 'intensity'),
-      this._intensity
-    )
-    gl.uniform3fv(
-      gl.getUniformLocation((this.blendPass as any).program, 'rayColor'),
-      this._rayColor
-    )
+    this.blendPass.setUniforms({
+      inputTexture: 0,
+      godRaysTexture: 1,
+      intensity: this._intensity,
+      rayColor: this._rayColor
+    })
 
     // Render to output
-    gl.bindFramebuffer(gl.FRAMEBUFFER, this.renderToScreen ? null : outputFramebuffer)
     this.blendPass.render(inputTexture, outputFramebuffer)
   }
 
