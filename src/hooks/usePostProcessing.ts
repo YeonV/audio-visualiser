@@ -119,7 +119,9 @@ export function usePostProcessing(
 
   // Initialize composer and passes - only depends on gl
   useEffect(() => {
-    if (!gl) return
+    // Safety check: Ensure gl is valid and has WebGL methods
+    // This prevents crashes if a non-WebGL context or an empty object (from rehydration) is passed
+    if (!gl || typeof gl.createFramebuffer !== 'function') return
 
     // Create composer with current size
     const { width: w, height: h } = sizeRef.current
