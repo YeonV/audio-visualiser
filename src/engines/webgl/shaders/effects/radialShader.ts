@@ -52,15 +52,16 @@ export const radialShader = `
 
     vec3 color = barColor * inBar * edge;
 
-    // Outer glow
+    // Outer glow - significantly strengthened
     float glowDist = abs(radius - (0.1 + barLength));
-    color += barColor * exp(-glowDist * 10.0) * 0.3 * edge;
+    color += barColor * exp(-glowDist * 8.0) * 0.8 * edge;
+    color += barColor * exp(-glowDist * 4.0) * 0.4 * edge;
 
     // Center glow
-    color += u_primaryColor * exp(-radius * 5.0) * u_bass * 0.5;
+    color += u_primaryColor * exp(-radius * 4.0) * u_bass * 0.8;
 
     // Beat pulse - use u_energy for instantaneous pulse
-    color *= 1.0 + u_energy * 0.5;
+    color *= 1.0 + u_energy * 0.8;
 
     gl_FragColor = vec4(color, 1.0);
   }

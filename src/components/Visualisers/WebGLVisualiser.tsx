@@ -45,7 +45,7 @@ export type WebGLVisualisationType = WebGLVisualiserId
 
 interface PostProcessingControls {
   getInputFramebuffer: () => WebGLFramebuffer | null
-  render: () => void
+  render: (width?: number, height?: number) => void
   updateTime: (deltaTime: number, beatData?: { isBeat: boolean; beatPhase: number; beatIntensity: number }) => void
 }
 
@@ -1037,7 +1037,7 @@ export const WebGLVisualiser = ({
 
     if (ppEnabled) {
       gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, null); gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, width, height)
-      const bd = beatDataRef.current; pp.updateTime(deltaTime, bd ? { isBeat: bd.isBeat, beatPhase: bd.beatPhase, beatIntensity: bd.beatIntensity } : undefined); pp.render()
+      const bd = beatDataRef.current; pp.updateTime(deltaTime, bd ? { isBeat: bd.isBeat, beatPhase: bd.beatPhase, beatIntensity: bd.beatIntensity } : undefined); pp.render(width, height)
     }
     animationRef.current = requestAnimationFrame(draw)
   }, [getSmoothData, drawBars3D, drawParticles, drawWaveform3D, drawRadial3D, drawBleep, drawConcentric, drawCustom, customShader])

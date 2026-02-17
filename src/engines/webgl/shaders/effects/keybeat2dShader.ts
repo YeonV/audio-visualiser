@@ -56,9 +56,11 @@ export const keybeat2dShader = `
 
     vec3 color = keyColor * keyShape * brightness;
 
-    // Glow for activated keys
+    // Glow for activated keys - strengthened and expanded
     if (activated > 0.5) {
-      color += keyColor * exp(-length(vec2(keyX - 0.5, uv.y - 0.5)) * 3.0) * 0.3;
+      float d = length(vec2(keyX - 0.5, uv.y - 0.5));
+      color += keyColor * exp(-d * 2.5) * 1.2;
+      color += keyColor * exp(-d * 1.5) * 0.4;
     }
 
     gl_FragColor = vec4(color, 1.0);

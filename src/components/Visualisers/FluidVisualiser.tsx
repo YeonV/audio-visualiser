@@ -433,11 +433,26 @@ export const FluidVisualiser = forwardRef<FluidVisualiserRef, FluidVisualiserPro
 
     const programsRef = useRef<Record<string, WebGLProgram | null>>({})
     const quadVAORef = useRef<WebGLVertexArrayObject | null>(null)
+    const quadBufferRef = useRef<WebGLBuffer | null>(null)
     const particleVAORef = useRef<WebGLVertexArrayObject | null>(null)
+    const particleBufferRef = useRef<WebGLBuffer | null>(null)
 
     const autoInjectAngleRef = useRef<number>(0)
     const lastBeatRef = useRef<boolean>(false)
     const [controlsVisible, setControlsVisible] = useState(false)
+
+    // Refs for frame-by-frame data to avoid re-creating animate loop
+    const audioDataRef = useRef(audioData)
+    const configRef = useRef(config)
+    const frequencyBandsRef = useRef(frequencyBands)
+    const beatDataRef = useRef(beatData)
+
+    useEffect(() => {
+      audioDataRef.current = audioData
+      configRef.current = config
+      frequencyBandsRef.current = frequencyBands
+      beatDataRef.current = beatData
+    }, [audioData, config, frequencyBands, beatData])
 
     const initFBOs = useCallback(() => {
       const gl = glRef.current
@@ -472,9 +487,45 @@ export const FluidVisualiser = forwardRef<FluidVisualiserRef, FluidVisualiserPro
       }
     }, [config.simResolution, config.dyeResolution, config.particleCount])
 
+    const dispose = useCallback(() => {
+      const gl = glRef.current
+      if (!gl) return
+
+      const disposeFBO = (fbo: FBO | null) => {
+        if (!fbo) return
+        gl.deleteFramebuffer(fbo.fbo)
+        gl.deleteTexture(fbo.texture)
+      }
+      const disposeDoubleFBO = (dfbo: DoubleFBO | null) => {
+        if (!dfbo) return
+        disposeFBO(dfbo.read)
+        disposeFBO(dfbo.write)
+      }
+
+      disposeDoubleFBO(velocityRef.current); velocityRef.current = null
+      disposeDoubleFBO(dyeRef.current); dyeRef.current = null
+      disposeDoubleFBO(pressureRef.current); pressureRef.current = null
+      if (divergenceRef.current) disposeFBO(divergenceRef.current); divergenceRef.current = null
+      if (curlRef.current) disposeFBO(curlRef.current); curlRef.current = null
+      disposeDoubleFBO(particlePosRef.current); particlePosRef.current = null
+
+      Object.values(programsRef.current).forEach(program => {
+        if (program) gl.deleteProgram(program)
+      })
+      programsRef.current = {}
+
+      if (quadVAORef.current) { gl.deleteVertexArray(quadVAORef.current); quadVAORef.current = null }
+      if (quadBufferRef.current) { gl.deleteBuffer(quadBufferRef.current); quadBufferRef.current = null }
+      if (particleVAORef.current) { gl.deleteVertexArray(particleVAORef.current); particleVAORef.current = null }
+      if (particleBufferRef.current) { gl.deleteBuffer(particleBufferRef.current); particleBufferRef.current = null }
+    }, [])
+
     const initGL = useCallback(() => {
       const canvas = canvasRef.current
       if (!canvas) return
+
+      // Clean up existing resources before re-init
+      dispose()
 
       const gl = canvas.getContext('webgl2', { alpha: false, antialias: false, preserveDrawingBuffer: false })
       if (!gl) { console.error('WebGL2 not supported'); return }
@@ -508,6 +559,7 @@ export const FluidVisualiser = forwardRef<FluidVisualiserRef, FluidVisualiserPro
       gl.enableVertexAttribArray(0)
       gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0)
       quadVAORef.current = quadVAO
+      quadBufferRef.current = quadBuffer
 
       const particleSize = Math.sqrt(config.particleCount)
       const particleUvs: number[] = []
@@ -524,10 +576,11 @@ export const FluidVisualiser = forwardRef<FluidVisualiserRef, FluidVisualiserPro
       gl.enableVertexAttribArray(0)
       gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0)
       particleVAORef.current = particleVAO
+      particleBufferRef.current = particleBuffer
 
       gl.bindVertexArray(null)
       initFBOs()
-    }, [config.particleCount, initFBOs])
+    }, [config.particleCount, initFBOs, dispose])
 
     const blit = useCallback((target: FBO | null) => {
       const gl = glRef.current
@@ -555,7 +608,7 @@ export const FluidVisualiser = forwardRef<FluidVisualiserRef, FluidVisualiserPro
       gl.uniform1f(gl.getUniformLocation(programs.splat, 'aspectRatio'), gl.canvas.width / gl.canvas.height)
       gl.uniform2f(gl.getUniformLocation(programs.splat, 'point'), x, y)
       gl.uniform3f(gl.getUniformLocation(programs.splat, 'color'), dx, dy, 0)
-      gl.uniform1f(gl.getUniformLocation(programs.splat, 'radius'), config.splatRadius / 100)
+      gl.uniform1f(gl.getUniformLocation(programs.splat, 'radius'), configRef.current.splatRadius / 100)
 
       gl.activeTexture(gl.TEXTURE0)
       gl.bindTexture(gl.TEXTURE_2D, velocity.read.texture)
@@ -577,6 +630,7 @@ export const FluidVisualiser = forwardRef<FluidVisualiserRef, FluidVisualiserPro
       const divergence = divergenceRef.current
       const curl = curlRef.current
       const particlePos = particlePosRef.current
+      const cfg = configRef.current
       if (!gl || !velocity || !dye || !pressure || !divergence || !curl) return
 
       gl.disable(gl.BLEND)
@@ -597,7 +651,7 @@ export const FluidVisualiser = forwardRef<FluidVisualiserRef, FluidVisualiserPro
         gl.uniform2f(gl.getUniformLocation(programs.vorticity, 'texelSize'), velocity.texelSizeX, velocity.texelSizeY)
         gl.uniform1i(gl.getUniformLocation(programs.vorticity, 'uVelocity'), 0)
         gl.uniform1i(gl.getUniformLocation(programs.vorticity, 'uCurl'), 1)
-        gl.uniform1f(gl.getUniformLocation(programs.vorticity, 'curl'), config.curl)
+        gl.uniform1f(gl.getUniformLocation(programs.vorticity, 'curl'), cfg.curl)
         gl.uniform1f(gl.getUniformLocation(programs.vorticity, 'dt'), dt)
         gl.activeTexture(gl.TEXTURE0)
         gl.bindTexture(gl.TEXTURE_2D, velocity.read.texture)
@@ -636,7 +690,7 @@ export const FluidVisualiser = forwardRef<FluidVisualiserRef, FluidVisualiserPro
         gl.uniform1i(gl.getUniformLocation(programs.pressure, 'uPressure'), 1)
         gl.activeTexture(gl.TEXTURE0)
         gl.bindTexture(gl.TEXTURE_2D, divergence.texture)
-        for (let i = 0; i < config.pressureIterations; i++) {
+        for (let i = 0; i < cfg.pressureIterations; i++) {
           gl.activeTexture(gl.TEXTURE1)
           gl.bindTexture(gl.TEXTURE_2D, pressure.read.texture)
           blit(pressure.write)
@@ -665,7 +719,7 @@ export const FluidVisualiser = forwardRef<FluidVisualiserRef, FluidVisualiserPro
         gl.uniform1i(gl.getUniformLocation(programs.advection, 'uVelocity'), 0)
         gl.uniform1i(gl.getUniformLocation(programs.advection, 'uSource'), 0)
         gl.uniform1f(gl.getUniformLocation(programs.advection, 'dt'), dt)
-        gl.uniform1f(gl.getUniformLocation(programs.advection, 'dissipation'), config.velocityDissipation)
+        gl.uniform1f(gl.getUniformLocation(programs.advection, 'dissipation'), cfg.velocityDissipation)
         gl.activeTexture(gl.TEXTURE0)
         gl.bindTexture(gl.TEXTURE_2D, velocity.read.texture)
         blit(velocity.write)
@@ -674,7 +728,7 @@ export const FluidVisualiser = forwardRef<FluidVisualiserRef, FluidVisualiserPro
         // Advect dye
         gl.uniform2f(gl.getUniformLocation(programs.advection, 'texelSize'), dye.texelSizeX, dye.texelSizeY)
         gl.uniform1i(gl.getUniformLocation(programs.advection, 'uSource'), 1)
-        gl.uniform1f(gl.getUniformLocation(programs.advection, 'dissipation'), config.densityDissipation)
+        gl.uniform1f(gl.getUniformLocation(programs.advection, 'dissipation'), cfg.densityDissipation)
         gl.activeTexture(gl.TEXTURE1)
         gl.bindTexture(gl.TEXTURE_2D, dye.read.texture)
         blit(dye.write)
@@ -696,13 +750,14 @@ export const FluidVisualiser = forwardRef<FluidVisualiserRef, FluidVisualiserPro
         blit(particlePos.write)
         particlePos.swap()
       }
-    }, [config, blit])
+    }, [blit])
 
     const render = useCallback(() => {
       const gl = glRef.current
       const programs = programsRef.current
       const dye = dyeRef.current
       const particlePos = particlePosRef.current
+      const cfg = configRef.current
       if (!gl || !programs.copy || !dye) return
 
       gl.bindFramebuffer(gl.FRAMEBUFFER, null)
@@ -725,9 +780,9 @@ export const FluidVisualiser = forwardRef<FluidVisualiserRef, FluidVisualiserPro
         gl.uniform1f(gl.getUniformLocation(programs.particleRender, 'pointSize'), 2.0)
         gl.uniform1f(gl.getUniformLocation(programs.particleRender, 'time'), timeRef.current)
 
-        const color1 = hexToRgbNormalized(config.primaryColor)
-        const color2 = hexToRgbNormalized(config.secondaryColor)
-        const color3 = hexToRgbNormalized(config.tertiaryColor)
+        const color1 = hexToRgbNormalized(cfg.primaryColor)
+        const color2 = hexToRgbNormalized(cfg.secondaryColor)
+        const color3 = hexToRgbNormalized(cfg.tertiaryColor)
         gl.uniform3f(gl.getUniformLocation(programs.particleRender, 'color1'), ...color1)
         gl.uniform3f(gl.getUniformLocation(programs.particleRender, 'color2'), ...color2)
         gl.uniform3f(gl.getUniformLocation(programs.particleRender, 'color3'), ...color3)
@@ -735,10 +790,10 @@ export const FluidVisualiser = forwardRef<FluidVisualiserRef, FluidVisualiserPro
         gl.activeTexture(gl.TEXTURE0)
         gl.bindTexture(gl.TEXTURE_2D, particlePos.read.texture)
         gl.bindVertexArray(particleVAORef.current)
-        gl.drawArrays(gl.POINTS, 0, config.particleCount)
+        gl.drawArrays(gl.POINTS, 0, cfg.particleCount)
         gl.disable(gl.BLEND)
       }
-    }, [config, blit])
+    }, [blit])
 
     const reset = useCallback(() => { initFBOs() }, [initFBOs])
 
@@ -751,6 +806,11 @@ export const FluidVisualiser = forwardRef<FluidVisualiserRef, FluidVisualiserPro
       timeRef.current += dt
 
       if (!isPlaying) { animationRef.current = requestAnimationFrame(animate); return }
+
+      const audioData = audioDataRef.current
+      const frequencyBands = frequencyBandsRef.current
+      const beatData = beatDataRef.current
+      const cfg = configRef.current
 
       let bass = 0, mid = 0, high = 0
       if (frequencyBands) {
@@ -765,30 +825,30 @@ export const FluidVisualiser = forwardRef<FluidVisualiserRef, FluidVisualiserPro
         bass /= bassEnd || 1; mid /= (midEnd - bassEnd) || 1; high /= (len - midEnd) || 1
       }
 
-      bass *= config.bassMultiplier * config.audioSensitivity
-      mid *= config.midMultiplier * config.audioSensitivity
-      high *= config.highMultiplier * config.audioSensitivity
+      bass *= cfg.bassMultiplier * cfg.audioSensitivity
+      mid *= cfg.midMultiplier * cfg.audioSensitivity
+      high *= cfg.highMultiplier * cfg.audioSensitivity
 
-      if (config.autoInject) {
-        autoInjectAngleRef.current += dt * config.autoInjectSpeed
+      if (cfg.autoInject) {
+        autoInjectAngleRef.current += dt * cfg.autoInjectSpeed
         const energy = (bass + mid * 0.5 + high * 0.3) / 3
-        const injectStrength = energy * config.splatForce
+        const injectStrength = energy * cfg.splatForce
 
         if (injectStrength > 100) {
           const leftX = 0.1 + Math.sin(autoInjectAngleRef.current) * 0.05
           const leftY = 0.5 + Math.cos(autoInjectAngleRef.current * 0.7) * 0.2
-          splat(leftX, leftY, bass * 500, 0, hexToRgbNormalized(config.tertiaryColor))
+          splat(leftX, leftY, bass * 500, 0, hexToRgbNormalized(cfg.tertiaryColor))
 
           const rightX = 0.9 + Math.sin(autoInjectAngleRef.current * 1.3) * 0.05
           const rightY = 0.5 + Math.cos(autoInjectAngleRef.current * 0.9) * 0.2
-          splat(rightX, rightY, -high * 500, 0, hexToRgbNormalized(config.tertiaryColor))
+          splat(rightX, rightY, -high * 500, 0, hexToRgbNormalized(cfg.tertiaryColor))
         }
 
         if (mid > 0.3) {
           const cx = 0.5 + Math.sin(autoInjectAngleRef.current * 2) * 0.15
           const cy = 0.5 + Math.cos(autoInjectAngleRef.current * 1.5) * 0.15
           const angle = autoInjectAngleRef.current * 3
-          splat(cx, cy, Math.cos(angle) * mid * 300, Math.sin(angle) * mid * 300, hexToRgbNormalized(config.primaryColor))
+          splat(cx, cy, Math.cos(angle) * mid * 300, Math.sin(angle) * mid * 300, hexToRgbNormalized(cfg.primaryColor))
         }
       }
 
@@ -796,17 +856,21 @@ export const FluidVisualiser = forwardRef<FluidVisualiserRef, FluidVisualiserPro
         const beatX = 0.5 + (Math.random() - 0.5) * 0.4
         const beatY = 0.5 + (Math.random() - 0.5) * 0.4
         const angle = Math.random() * Math.PI * 2
-        const force = beatData.beatIntensity * config.splatForce * 2
-        splat(beatX, beatY, Math.cos(angle) * force, Math.sin(angle) * force, hexToRgbNormalized(config.secondaryColor))
+        const force = beatData.beatIntensity * cfg.splatForce * 2
+        splat(beatX, beatY, Math.cos(angle) * force, Math.sin(angle) * force, hexToRgbNormalized(cfg.secondaryColor))
       }
       lastBeatRef.current = beatData?.isBeat || false
 
       step(dt)
       render()
       animationRef.current = requestAnimationFrame(animate)
-    }, [isPlaying, audioData, frequencyBands, beatData, config, splat, step, render])
+    }, [isPlaying, splat, step, render])
 
-    useEffect(() => { initGL() }, [initGL])
+    useEffect(() => {
+      initGL()
+      return () => dispose()
+    }, [initGL, dispose])
+
     useEffect(() => {
       animationRef.current = requestAnimationFrame(animate)
       return () => { if (animationRef.current) cancelAnimationFrame(animationRef.current) }
@@ -846,7 +910,8 @@ export const FluidVisualiser = forwardRef<FluidVisualiserRef, FluidVisualiserPro
         if (!isDown) return
         const x = e.offsetX / canvas.clientWidth
         const y = 1.0 - e.offsetY / canvas.clientHeight
-        splat(x, y, (x - lastX) * config.splatForce, (y - lastY) * config.splatForce, hexToRgbNormalized(config.primaryColor))
+        const cfg = configRef.current
+        splat(x, y, (x - lastX) * cfg.splatForce, (y - lastY) * cfg.splatForce, hexToRgbNormalized(cfg.primaryColor))
         lastX = x; lastY = y
       }
       const handleMouseUp = () => { isDown = false }
@@ -861,7 +926,7 @@ export const FluidVisualiser = forwardRef<FluidVisualiserRef, FluidVisualiserPro
         canvas.removeEventListener('mouseup', handleMouseUp)
         canvas.removeEventListener('mouseleave', handleMouseUp)
       }
-    }, [config.splatForce, config.primaryColor, splat])
+    }, [splat])
 
     const renderControls = () => {
       if (!showControls || !controlsVisible) return null

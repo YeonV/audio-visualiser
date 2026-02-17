@@ -65,7 +65,7 @@ export interface BeatData {
 export interface PostProcessingControls {
   composer: Composer | null
   getInputFramebuffer: () => WebGLFramebuffer | null
-  render: () => void
+  render: (width?: number, height?: number) => void
   setConfig: (config: Partial<PostProcessingConfig>) => void
   toggleEffect: (effect: keyof PostProcessingConfig, enabled: boolean) => void
   triggerGlitch: (intensity?: number, duration?: number) => void
@@ -289,8 +289,11 @@ export function usePostProcessing(
   }, [])
 
   // Render post-processing chain
-  const render = useCallback((): void => {
+  const render = useCallback((width?: number, height?: number): void => {
     if (composerRef.current) {
+      if (width !== undefined && height !== undefined && width > 0 && height > 0) {
+        composerRef.current.setSize(width, height)
+      }
       composerRef.current.render()
     }
   }, [])
