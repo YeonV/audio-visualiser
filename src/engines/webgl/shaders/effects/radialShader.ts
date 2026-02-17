@@ -9,6 +9,7 @@ export const radialShader = `
   uniform float u_mid;
   uniform float u_high;
   uniform float u_beat;
+  uniform float u_energy;
   uniform vec2 u_resolution;
   uniform sampler2D u_melbank;
   uniform float u_bands;
@@ -58,8 +59,8 @@ export const radialShader = `
     // Center glow
     color += u_primaryColor * exp(-radius * 5.0) * u_bass * 0.5;
 
-    // Beat pulse
-    color *= 1.0 + u_beat * 0.3;
+    // Beat pulse - use u_energy for instantaneous pulse
+    color *= 1.0 + u_energy * 0.5;
 
     gl_FragColor = vec4(color, 1.0);
   }

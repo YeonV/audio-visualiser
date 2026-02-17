@@ -44,6 +44,7 @@ export interface FluidVisualiserProps {
   frequencyBands?: { bass: number; mid: number; high: number }
   beatData?: { isBeat: boolean; beatIntensity: number; bpm: number }
   showControls?: boolean
+  onContextCreated?: (gl: WebGLRenderingContext | WebGL2RenderingContext, canvas: HTMLCanvasElement) => void
 }
 
 export interface FluidVisualiserRef {
@@ -416,7 +417,7 @@ function hexToRgbNormalized(hex: string): [number, number, number] {
 
 // Main Component
 export const FluidVisualiser = forwardRef<FluidVisualiserRef, FluidVisualiserProps>(
-  ({ audioData, isPlaying, config, onConfigChange, frequencyBands, beatData, showControls = true }, ref) => {
+  ({ audioData, isPlaying, config, onConfigChange, frequencyBands, beatData, showControls = true, onContextCreated }, ref) => {
     const canvasRef = useRef<HTMLCanvasElement>(null)
     const glRef = useRef<WebGL2RenderingContext | null>(null)
     const animationRef = useRef<number>(0)
@@ -478,6 +479,10 @@ export const FluidVisualiser = forwardRef<FluidVisualiserRef, FluidVisualiserPro
       const gl = canvas.getContext('webgl2', { alpha: false, antialias: false, preserveDrawingBuffer: false })
       if (!gl) { console.error('WebGL2 not supported'); return }
       glRef.current = gl
+
+      if (onContextCreated) {
+        onContextCreated(gl, canvas)
+      }
 
       gl.getExtension('EXT_color_buffer_float')
       gl.getExtension('OES_texture_float_linear')
@@ -813,10 +818,17 @@ export const FluidVisualiser = forwardRef<FluidVisualiserRef, FluidVisualiserPro
       const handleResize = () => {
         const parent = canvas.parentElement
         if (parent) {
-          canvas.width = parent.clientWidth * window.devicePixelRatio
-          canvas.height = parent.clientHeight * window.devicePixelRatio
-          canvas.style.width = `${parent.clientWidth}px`
-          canvas.style.height = `${parent.clientHeight}px`
+          const w = parent.clientWidth * window.devicePixelRatio
+          const h = parent.clientHeight * window.devicePixelRatio
+          if (canvas.width !== w || canvas.height !== h) {
+            canvas.width = w
+            canvas.height = h
+            canvas.style.width = `${parent.clientWidth}px`
+            canvas.style.height = `${parent.clientHeight}px`
+            if (glRef.current && onContextCreated) {
+              onContextCreated(glRef.current, canvas)
+            }
+          }
         }
       }
       handleResize()

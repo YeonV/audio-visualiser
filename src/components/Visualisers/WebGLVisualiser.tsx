@@ -994,6 +994,10 @@ export const WebGLVisualiser = ({
     const gl = glRef.current; const canvas = canvasRef.current
     if (!gl || !canvas || !isDrawingRef.current) return
     const width = canvas.width, height = canvas.height
+
+    // Always set viewport at the start of frame
+    gl.viewport(0, 0, width, height)
+
     if (programRef.current) gl.useProgram(programRef.current)
     gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
 
@@ -1117,9 +1121,21 @@ export const WebGLVisualiser = ({
       if (canvasRef.current) {
         const container = canvasRef.current.parentElement
         if (container) {
-          canvasRef.current.width = container.clientWidth
-          canvasRef.current.height = container.clientHeight
-          if (glRef.current) glRef.current.viewport(0, 0, canvasRef.current.width, canvasRef.current.height)
+          const w = container.clientWidth
+          const h = container.clientHeight
+
+          if (canvasRef.current.width !== w || canvasRef.current.height !== h) {
+            canvasRef.current.width = w
+            canvasRef.current.height = h
+
+            if (glRef.current) {
+              glRef.current.viewport(0, 0, w, h)
+              // Notify parent about size change to update post-processing composer
+              if (onContextCreatedRef.current) {
+                onContextCreatedRef.current(glRef.current, canvasRef.current)
+              }
+            }
+          }
         }
       }
     }

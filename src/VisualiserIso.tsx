@@ -75,10 +75,13 @@ const VisualiserIsoInner = (
       if (glContextRef.current !== gl) {
         glContextRef.current = gl
         setGlContext(gl)
+      }
+      // Always update size if it changed, even if context is the same
+      if (canvasSize.width !== canvas.width || canvasSize.height !== canvas.height) {
         setCanvasSize({ width: canvas.width, height: canvas.height })
       }
     },
-    [setGlContext, setCanvasSize]
+    [setGlContext, setCanvasSize, canvasSize.width, canvasSize.height]
   )
 
   const handleTypeChange = useCallback(

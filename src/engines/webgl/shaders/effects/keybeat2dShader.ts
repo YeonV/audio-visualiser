@@ -9,6 +9,7 @@ export const keybeat2dShader = `
   uniform float u_mid;
   uniform float u_high;
   uniform float u_beat;
+  uniform float u_energy;
   uniform vec2 u_resolution;
   uniform float u_keys;
 
@@ -33,7 +34,8 @@ export const keybeat2dShader = `
 
     // Key activation based on beat and randomness
     float seed = random(vec2(keyIdx, floor(u_time * 8.0)));
-    float activated = step(0.7 - u_beat * 0.3, seed);
+    // Use u_energy for instantaneous pulse
+    float activated = step(0.7 - u_energy * 0.5, seed);
 
     // Key shape
     float keyShape = smoothstep(0.0, 0.1, keyX) * smoothstep(1.0, 0.9, keyX);
