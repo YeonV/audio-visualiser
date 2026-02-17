@@ -1827,7 +1827,14 @@ const AstrofoxVisualiser = forwardRef<AstrofoxVisualiserRef, AstrofoxVisualiserP
       window.addEventListener('resize', handleResize)
       handleResize()
 
-      return () => window.removeEventListener('resize', handleResize)
+      return () => {
+        window.removeEventListener('resize', handleResize)
+        // Clear caches on unmount
+        fftParserCache.current.clear()
+        waveParserCache.current.clear()
+        geometryCache.current.clear()
+        imageCache.current.clear()
+      }
     }, [])
 
     // Animation loop

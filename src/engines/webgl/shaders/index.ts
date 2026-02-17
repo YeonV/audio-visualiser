@@ -6,7 +6,7 @@
  */
 
 // Utility functions
-export { createShader, createProgram, hexToRgb } from './utils'
+export { createShader, createProgram, hexToRgb, deleteProgramAndShaders } from './utils'
 
 // Base shaders
 export {
