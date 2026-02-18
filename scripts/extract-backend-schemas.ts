@@ -423,13 +423,13 @@ export const VISUALISER_SCHEMAS: Record<string, VisualizerSchema> = {\n`
     const displayName = key.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
 
     // UI Tweaks for specific effects
-    if (key === 'texter') {
+    if (key === 'texter' || key === 'bladeTexter') {
       schema.hiddenKeys.push('alpha', 'text_color', 'use_gradient', 'option_1', 'option_2', 'value_option_1', 'resize_method', 'deep_diag', 'background_mode', 'blur', 'height_percent')
       schema.advancedKeys.push('impulse_decay', 'multiplier', 'speed_option_1', 'gradient_roll')
 
       // Add zoom, squeeze_x, squeeze_y, offset_x, offset_y fields for new shader controls (no height_percent)
       schema.fields = schema.fields.filter(f => f.id !== 'height_percent')
-      schema.fields.push(
+      const extraFields: SchemaField[] = [
         {
           id: 'zoom',
           title: 'Zoom',
@@ -475,13 +475,48 @@ export const VISUALISER_SCHEMAS: Record<string, VisualizerSchema> = {\n`
           max: 2.0,
           step: 0.01
         }
-      )
+      ]
+
+      if (key === 'bladeTexter') {
+        extraFields.push(
+          { id: 'text2', title: 'Text 2', type: 'string', default: 'LedFx' },
+          { id: 'font2', title: 'Font 2', type: 'string', default: 'Press Start 2P', enum: ["Press Start 2P", "Blade-5x8", "8bitOperatorPlus8-Regular", "Roboto-Black", "Roboto-Bold", "Roboto-Regular", "Stop", "technique"] },
+          { id: 'text_color2', title: 'Text Color 2', type: 'color', default: '#FFFFFF' },
+          { id: 'text_effect2', title: 'Text Effect 2', type: 'string', default: 'Side Scroll', enum: ["Side Scroll", "Spokes", "Carousel", "Wave", "Pulse", "Fade"] },
+          { id: 'zoom2', title: 'Zoom 2', type: 'number', default: 1.0, min: 0.1, max: 5.0, step: 0.01 },
+          { id: 'stretch_x2', title: 'Stretch X 2', type: 'number', default: 1.0, min: 0.1, max: 5.0, step: 0.01 },
+          { id: 'stretch_y2', title: 'Stretch Y 2', type: 'number', default: 1.0, min: 0.1, max: 5.0, step: 0.01 },
+          { id: 'offset_x2', title: 'Offset X 2', type: 'number', default: 0.0, min: -2.0, max: 2.0, step: 0.01 },
+          { id: 'offset_y2', title: 'Offset Y 2', type: 'number', default: 0.0, min: -2.0, max: 2.0, step: 0.01 },
+          { id: 'flip_horizontal2', title: 'Flip Horizontal 2', type: 'boolean', default: false },
+          { id: 'flip_vertical2', title: 'Flip Vertical 2', type: 'boolean', default: false },
+          { id: 'rotate2', title: 'Rotate 2', type: 'integer', default: 0, min: 0, max: 360, step: 1 }
+        )
+      }
+
+      schema.fields.push(...extraFields)
+
       schema.defaults.font_size = 240
       schema.defaults.zoom = 1.0
       schema.defaults.stretch_x = 1.0
       schema.defaults.stretch_y = 1.0
       schema.defaults.offset_x = 0.0
       schema.defaults.offset_y = 0.0
+
+      if (key === 'bladeTexter') {
+        schema.defaults.text2 = 'LedFx'
+        schema.defaults.font2 = 'Press Start 2P'
+        schema.defaults.text_color2 = '#FFFFFF'
+        schema.defaults.text_effect2 = 'Side Scroll'
+        schema.defaults.zoom2 = 1.0
+        schema.defaults.stretch_x2 = 1.0
+        schema.defaults.stretch_y2 = 1.0
+        schema.defaults.offset_x2 = 0.0
+        schema.defaults.offset_y2 = 0.0
+        schema.defaults.flip_horizontal2 = false
+        schema.defaults.flip_vertical2 = false
+        schema.defaults.rotate2 = 0
+      }
     }
 
     output += `  "${key}": {\n`
@@ -672,6 +707,13 @@ async function main() {
       
       // Save updated cache
       await saveCache(newCache)
+    }
+
+    // Duplicate texter to bladeTexter if it exists
+    if (schemas['texter']) {
+      console.log('✨ Duplicating texter to bladeTexter...')
+      schemas['bladeTexter'] = JSON.parse(JSON.stringify(schemas['texter']))
+      originalNames['bladeTexter'] = originalNames['texter'] || 'texter2d'
     }
 
     // Report statistics

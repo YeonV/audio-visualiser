@@ -32,6 +32,7 @@ import {
   blocksShader,
   keybeat2dShader,
   texterShader,
+  bladeTexterShader,
   plasmaWled2dShader,
   radialShader,
   soapShader,
@@ -105,8 +106,10 @@ export const WebGLVisualiser = ({
   const historyTextureRef = useRef<WebGLTexture | null>(null)
   const gradientTextureRef = useRef<WebGLTexture | null>(null)
   const textTextureRef = useRef<WebGLTexture | null>(null)
+  const textTexture2Ref = useRef<WebGLTexture | null>(null)
   const currentGradientStrRef = useRef<string | null>(null)
   const currentTextKeyRef = useRef<string | null>(null)
+  const currentTextKey2Ref = useRef<string | null>(null)
   const animationRef = useRef<number | undefined>(undefined)
   const startTimeRef = useRef<number>(performance.now())
   const previousDataRef = useRef<number[] | Float32Array>([])
@@ -126,6 +129,7 @@ export const WebGLVisualiser = ({
   const smoothedDataArrayRef = useRef<Float32Array | null>(null)
   const melbankArrayRef = useRef<Uint8Array | null>(null)
   const textStateRef = useRef({ aspect: 1.0, texW: 0, texH: 0 })
+  const textState2Ref = useRef({ aspect: 1.0, texW: 0, texH: 0 })
   const typedArraysRef = useRef<Map<string, any>>(new Map())
 
   const getTypedArray = useCallback((name: string, length: number, Type: any = Float32Array) => {
@@ -197,72 +201,67 @@ export const WebGLVisualiser = ({
 
   // Helper to handle text texture
   const handleTextTexture = useCallback((gl: WebGLRenderingContext, cfg: any) => {
-    const text = cfg.text || 'LedFx';
-    const font = cfg.font || 'Press Start 2P';
-    const color = cfg.text_color || '#FFFFFF';
     const fontSize = 180;
-    // Use 2x canvas size for text texture, fallback to 2000x1000 if canvas not available
     const canvasW = gl.canvas ? gl.canvas.width : 1000;
     const canvasH = gl.canvas ? gl.canvas.height : 500;
     const texW = Math.max(2000, canvasW * 2);
     const texH = Math.max(1000, canvasH * 2);
-    const key = `${text}-${font}-${color}-${texW}x${texH}`;
 
-    // Helper to actually draw the text to the canvas and upload to texture
-    const drawTextToTexture = () => {
-      if (!textTextureRef.current) {
-        textTextureRef.current = gl.createTexture();
+    const processLayer = (idx: number, text: string, font: string, color: string, textureRef: React.MutableRefObject<WebGLTexture | null>, keyRef: React.MutableRefObject<string | null>, stateRef: React.MutableRefObject<{ aspect: number; texW: number; texH: number }>) => {
+      const key = `${text}-${font}-${color}-${texW}x${texH}`;
+      const texUnit = idx === 1 ? gl.TEXTURE2 : gl.TEXTURE3;
+
+      const drawTextToTexture = () => {
+        if (!textureRef.current) textureRef.current = gl.createTexture();
+        if (!offscreenCanvasRef.current) offscreenCanvasRef.current = document.createElement('canvas');
+        const outCanvas = offscreenCanvasRef.current;
+        outCanvas.width = texW;
+        outCanvas.height = texH;
+        const ctx = outCanvas.getContext('2d');
+        if (ctx) {
+          ctx.clearRect(0, 0, texW, texH);
+          ctx.font = `${fontSize}px "${font}", Arial`;
+          ctx.fillStyle = color;
+          ctx.textBaseline = 'top';
+          ctx.textAlign = 'left';
+          ctx.fillText(text, 0, 0);
+
+          gl.activeTexture(texUnit);
+          gl.bindTexture(gl.TEXTURE_2D, textureRef.current);
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, outCanvas);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+          stateRef.current.aspect = texW / texH;
+        }
+      };
+
+      if (keyRef.current !== key || stateRef.current.texW !== texW) {
+        keyRef.current = key;
+        stateRef.current.texW = texW;
+        stateRef.current.texH = texH;
+        if (document.fonts && document.fonts.load) {
+          document.fonts.load(`${fontSize}px "${font}"`).then(() => drawTextToTexture());
+        } else {
+          drawTextToTexture();
+        }
       }
 
-      if (!offscreenCanvasRef.current) {
-        offscreenCanvasRef.current = document.createElement('canvas');
-      }
-      const outCanvas = offscreenCanvasRef.current;
-      outCanvas.width = texW;
-      outCanvas.height = texH;
-      const ctx = outCanvas.getContext('2d');
-      if (ctx) {
-        ctx.clearRect(0, 0, texW, texH);
-        ctx.font = `${fontSize}px "${font}", Arial`;
-        ctx.fillStyle = color;
-        ctx.textBaseline = 'top';
-        ctx.textAlign = 'left';
-        ctx.fillText(text, 0, 0);
-
-        gl.activeTexture(gl.TEXTURE2);
-        gl.bindTexture(gl.TEXTURE_2D, textTextureRef.current);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, outCanvas);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-
-        textStateRef.current.aspect = texW / texH;
+      const locName = idx === 1 ? 'u_textTexture' : 'u_textTexture2';
+      const aspectName = idx === 1 ? 'u_textAspect' : 'u_textAspect2';
+      const textLoc = getLoc(locName);
+      if (textLoc) {
+        gl.activeTexture(texUnit);
+        gl.bindTexture(gl.TEXTURE_2D, textureRef.current);
+        gl.uniform1i(textLoc, idx === 1 ? 2 : 3);
+        gl.uniform1f(getLoc(aspectName), stateRef.current.aspect);
       }
     };
 
-    // Only redraw if key or texture width changed
-    if (currentTextKeyRef.current !== key || textStateRef.current.texW !== texW) {
-      currentTextKeyRef.current = key;
-      textStateRef.current.texW = texW;
-      textStateRef.current.texH = texH;
-
-      // Wait for font to be loaded, then redraw
-      if (document.fonts && document.fonts.load) {
-        document.fonts.load(`${fontSize}px "${font}"`).then(() => {
-          drawTextToTexture();
-        });
-      } else {
-        drawTextToTexture();
-      }
-    }
-
-    const textLoc = getLoc('u_textTexture');
-    if (textLoc) {
-      gl.activeTexture(gl.TEXTURE2);
-      gl.bindTexture(gl.TEXTURE_2D, textTextureRef.current);
-      gl.uniform1i(textLoc, 2);
-      gl.uniform1f(getLoc('u_textAspect'), textStateRef.current.aspect);
+    processLayer(1, cfg.text || 'LedFx', cfg.font || 'Press Start 2P', cfg.text_color || '#FFFFFF', textTextureRef, currentTextKeyRef, textStateRef);
+    if (visualTypeRef.current === 'bladeTexter') {
+      processLayer(2, cfg.text2 || 'LedFx', cfg.font2 || 'Press Start 2P', cfg.text_color2 || '#FFFFFF', textTexture2Ref, currentTextKey2Ref, textState2Ref);
     }
   }, [getLoc])
 
@@ -393,6 +392,9 @@ export const WebGLVisualiser = ({
       } else if (type === 'texter') {
         vertexSource = quadVertexShader
         fragmentSource = texterShader
+      } else if (type === 'bladeTexter') {
+        vertexSource = quadVertexShader
+        fragmentSource = bladeTexterShader
       } else if (type === 'plasmawled2d') {
         vertexSource = quadVertexShader
         fragmentSource = plasmaWled2dShader
@@ -963,7 +965,7 @@ export const WebGLVisualiser = ({
       gl.uniform1f(getLoc('u_flip'), (cfg.align === 'invert' || cfg.flip) ? 1.0 : 0.0)
       gl.uniform1f(getLoc('u_blockSize'), cfg.block_count ?? cfg.block_size ?? 10.0)
       gl.uniform1f(getLoc('u_keys'), (cfg.stretch_horizontal / 6.25) || (cfg.keys ?? 16.0))
-      if (currentVisualType === 'texter') {
+      if (currentVisualType === 'texter' || currentVisualType === 'bladeTexter') {
         // Native baseline: zoom, stretch_x, stretch_y, offset_x, offset_y are direct multipliers (1.0 = native, no inversion)
         const zoom = typeof cfg.zoom === 'number' ? cfg.zoom : 1.0;
         const stretchX = typeof cfg.stretch_x === 'number' ? cfg.stretch_x : 1.0;
@@ -975,10 +977,24 @@ export const WebGLVisualiser = ({
         gl.uniform1f(getLoc('u_squeezeY'), stretchY)
         gl.uniform1f(getLoc('u_offsetX'), offsetX)
         gl.uniform1f(getLoc('u_offsetY'), offsetY)
-        handleTextTexture(gl, cfg)
+
         const effectMap: Record<string, number> = { 'Side Scroll': 0, 'Spokes': 1, 'Carousel': 2, 'Wave': 3, 'Pulse': 4, 'Fade': 5 }
         gl.uniform1i(getLoc('u_textEffect'), effectMap[cfg.text_effect] ?? 0)
         gl.uniform1f(getLoc('u_speed'), cfg.speed_option_1 ?? 1.0)
+
+        if (currentVisualType === 'bladeTexter') {
+          gl.uniform1i(getLoc('u_textEffect2'), effectMap[cfg.text_effect2] ?? 0)
+          gl.uniform1i(getLoc('u_flipH2'), cfg.flip_horizontal2 ? 1 : 0)
+          gl.uniform1i(getLoc('u_flipV2'), cfg.flip_vertical2 ? 1 : 0)
+          gl.uniform1f(getLoc('u_rotate2'), (cfg.rotate2 ?? 0) * Math.PI / 180)
+          gl.uniform1f(getLoc('u_zoom2'), cfg.zoom2 ?? 1.0)
+          gl.uniform1f(getLoc('u_squeezeX2'), cfg.stretch_x2 ?? 1.0)
+          gl.uniform1f(getLoc('u_squeezeY2'), cfg.stretch_y2 ?? 1.0)
+          gl.uniform1f(getLoc('u_offsetX2'), cfg.offset_x2 ?? 0.0)
+          gl.uniform1f(getLoc('u_offsetY2'), cfg.offset_y2 ?? 0.0)
+        }
+
+        handleTextTexture(gl, cfg)
       }
       if (currentVisualType === 'radial') gl.uniform1f(getLoc('u_bands'), cfg.edges || cfg.bands || 32.0)
       if (currentVisualType === 'bands' || currentVisualType === 'bandsmatrix') gl.uniform1f(getLoc('u_bands'), cfg.band_count || cfg.bands || 16.0)
@@ -1081,6 +1097,7 @@ export const WebGLVisualiser = ({
     const melTexRef = melbankTextureRef
     const histTexRef = historyTextureRef
     const textTexRef = textTextureRef
+    const textTex2Ref = textTexture2Ref
     const quadBufRef = quadBufferRef
     const progRef = programRef
     const gradStrRef = currentGradientStrRef
@@ -1105,6 +1122,7 @@ export const WebGLVisualiser = ({
         if (melTex) gl.deleteTexture(melTex)
         if (histTex) gl.deleteTexture(histTex)
         if (textTex) gl.deleteTexture(textTex)
+        if (textTex2Ref.current) gl.deleteTexture(textTex2Ref.current)
 
         buffers.forEach(buffer => gl.deleteBuffer(buffer))
         buffers.clear()
@@ -1123,6 +1141,7 @@ export const WebGLVisualiser = ({
         melTexRef.current = null
         histTexRef.current = null
         textTexRef.current = null
+        textTex2Ref.current = null
         quadBufRef.current = null
         progRef.current = null
         gradStrRef.current = null
