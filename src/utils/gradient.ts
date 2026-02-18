@@ -4,6 +4,9 @@
  * Helpers for parsing CSS gradient strings and converting them to WebGL-compatible formats.
  */
 
+let sharedCanvas: HTMLCanvasElement | null = null
+let sharedCtx: CanvasRenderingContext2D | null = null
+
 /**
  * Parses a LedFx-style CSS linear-gradient string into a Uint8Array of RGBA values.
  * Uses a canvas for robust parsing of various CSS color formats.
@@ -24,10 +27,22 @@ export function parseGradient(gradientStr: string, size: number = 256): Uint8Arr
 
   if (typeof document === 'undefined') return createFallback()
 
-  const canvas = document.createElement('canvas')
-  canvas.width = size
-  canvas.height = 1
-  const ctx = canvas.getContext('2d', { willReadFrequently: true })
+  if (!sharedCanvas) {
+    sharedCanvas = document.createElement('canvas')
+    sharedCanvas.height = 1
+  }
+
+  if (sharedCanvas.width !== size) {
+    sharedCanvas.width = size
+    sharedCtx = null // Force context recreation if size changed
+  }
+
+  if (!sharedCtx) {
+    sharedCtx = sharedCanvas.getContext('2d', { willReadFrequently: true })
+  }
+
+  const canvas = sharedCanvas
+  const ctx = sharedCtx
 
   if (!ctx) return createFallback()
 

@@ -156,6 +156,8 @@ export const WebGLVisualiser = ({
 
   // Uniform location cache
   const locationsRef = useRef<Record<string, WebGLUniformLocation | null>>({})
+  const attribLocationsRef = useRef<Record<string, number>>({})
+  const zeroArrayRef = useRef<Float32Array | null>(null)
 
   // Keep refs in sync
   useEffect(() => {
@@ -182,6 +184,14 @@ export const WebGLVisualiser = ({
     if (!glRef.current || !programRef.current) return null
     const loc = glRef.current.getUniformLocation(programRef.current, name)
     locationsRef.current[name] = loc
+    return loc
+  }, [])
+
+  const getAttribLoc = useCallback((name: string) => {
+    if (attribLocationsRef.current[name] !== undefined) return attribLocationsRef.current[name]
+    if (!glRef.current || !programRef.current) return -1
+    const loc = glRef.current.getAttribLocation(programRef.current, name)
+    attribLocationsRef.current[name] = loc
     return loc
   }, [])
 
@@ -499,14 +509,16 @@ export const WebGLVisualiser = ({
       const positionBuffer = getBuffer(gl, 'bars3d_pos')
       gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer)
       gl.bufferData(gl.ARRAY_BUFFER, posArr, gl.DYNAMIC_DRAW)
-      const positionLoc = gl.getAttribLocation(program, 'a_position')
-      gl.enableVertexAttribArray(positionLoc)
-      gl.vertexAttribPointer(positionLoc, 2, gl.FLOAT, false, 0, 0)
+      const positionLoc = getAttribLoc('a_position')
+      if (positionLoc !== -1) {
+        gl.enableVertexAttribArray(positionLoc)
+        gl.vertexAttribPointer(positionLoc, 2, gl.FLOAT, false, 0, 0)
+      }
 
       const amplitudeBuffer = getBuffer(gl, 'bars3d_amp')
       gl.bindBuffer(gl.ARRAY_BUFFER, amplitudeBuffer)
       gl.bufferData(gl.ARRAY_BUFFER, ampArr, gl.DYNAMIC_DRAW)
-      const amplitudeLoc = gl.getAttribLocation(program, 'a_amplitude')
+      const amplitudeLoc = getAttribLoc('a_amplitude')
       if (amplitudeLoc !== -1) {
         gl.enableVertexAttribArray(amplitudeLoc)
         gl.vertexAttribPointer(amplitudeLoc, 1, gl.FLOAT, false, 0, 0)
@@ -515,7 +527,7 @@ export const WebGLVisualiser = ({
       const indexBuffer = getBuffer(gl, 'bars3d_idx')
       gl.bindBuffer(gl.ARRAY_BUFFER, indexBuffer)
       gl.bufferData(gl.ARRAY_BUFFER, idxArr, gl.DYNAMIC_DRAW)
-      const indexLoc = gl.getAttribLocation(program, 'a_index')
+      const indexLoc = getAttribLoc('a_index')
       if (indexLoc !== -1) {
         gl.enableVertexAttribArray(indexLoc)
         gl.vertexAttribPointer(indexLoc, 1, gl.FLOAT, false, 0, 0)
@@ -536,7 +548,7 @@ export const WebGLVisualiser = ({
       if (amplitudeLoc !== -1) gl.disableVertexAttribArray(amplitudeLoc)
       if (indexLoc !== -1) gl.disableVertexAttribArray(indexLoc)
     },
-    [getLoc, handleGradients, getBuffer, getTypedArray]
+    [getLoc, getAttribLoc, handleGradients, getBuffer, getTypedArray]
   )
 
   // Draw particles
@@ -605,22 +617,22 @@ export const WebGLVisualiser = ({
       }
 
       const posBuf = getBuffer(gl, 'part_pos'); gl.bindBuffer(gl.ARRAY_BUFFER, posBuf); gl.bufferData(gl.ARRAY_BUFFER, posArr, gl.DYNAMIC_DRAW)
-      const posLoc = gl.getAttribLocation(program, 'a_position'); gl.enableVertexAttribArray(posLoc); gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0)
+      const posLoc = getAttribLoc('a_position'); if (posLoc !== -1) { gl.enableVertexAttribArray(posLoc); gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0) }
 
       const velBuf = getBuffer(gl, 'part_vel'); gl.bindBuffer(gl.ARRAY_BUFFER, velBuf); gl.bufferData(gl.ARRAY_BUFFER, velArr, gl.DYNAMIC_DRAW)
-      const velLoc = gl.getAttribLocation(program, 'a_velocity'); if (velLoc !== -1) { gl.enableVertexAttribArray(velLoc); gl.vertexAttribPointer(velLoc, 2, gl.FLOAT, false, 0, 0) }
+      const velLoc = getAttribLoc('a_velocity'); if (velLoc !== -1) { gl.enableVertexAttribArray(velLoc); gl.vertexAttribPointer(velLoc, 2, gl.FLOAT, false, 0, 0) }
 
       const lifeBuf = getBuffer(gl, 'part_life'); gl.bindBuffer(gl.ARRAY_BUFFER, lifeBuf); gl.bufferData(gl.ARRAY_BUFFER, lifeArr, gl.DYNAMIC_DRAW)
-      const lifeLoc = gl.getAttribLocation(program, 'a_life'); if (lifeLoc !== -1) { gl.enableVertexAttribArray(lifeLoc); gl.vertexAttribPointer(lifeLoc, 1, gl.FLOAT, false, 0, 0) }
+      const lifeLoc = getAttribLoc('a_life'); if (lifeLoc !== -1) { gl.enableVertexAttribArray(lifeLoc); gl.vertexAttribPointer(lifeLoc, 1, gl.FLOAT, false, 0, 0) }
 
       const sizeBuf = getBuffer(gl, 'part_size'); gl.bindBuffer(gl.ARRAY_BUFFER, sizeBuf); gl.bufferData(gl.ARRAY_BUFFER, sizeArr, gl.DYNAMIC_DRAW)
-      const sizeLoc = gl.getAttribLocation(program, 'a_size'); if (sizeLoc !== -1) { gl.enableVertexAttribArray(sizeLoc); gl.vertexAttribPointer(sizeLoc, 1, gl.FLOAT, false, 0, 0) }
+      const sizeLoc = getAttribLoc('a_size'); if (sizeLoc !== -1) { gl.enableVertexAttribArray(sizeLoc); gl.vertexAttribPointer(sizeLoc, 1, gl.FLOAT, false, 0, 0) }
 
       const ampBuf = getBuffer(gl, 'part_amp'); gl.bindBuffer(gl.ARRAY_BUFFER, ampBuf); gl.bufferData(gl.ARRAY_BUFFER, ampArr, gl.DYNAMIC_DRAW)
-      const ampLoc = gl.getAttribLocation(program, 'a_amplitude'); if (ampLoc !== -1) { gl.enableVertexAttribArray(ampLoc); gl.vertexAttribPointer(ampLoc, 1, gl.FLOAT, false, 0, 0) }
+      const ampLoc = getAttribLoc('a_amplitude'); if (ampLoc !== -1) { gl.enableVertexAttribArray(ampLoc); gl.vertexAttribPointer(ampLoc, 1, gl.FLOAT, false, 0, 0) }
 
       const idxBuf = getBuffer(gl, 'part_idx'); gl.bindBuffer(gl.ARRAY_BUFFER, idxBuf); gl.bufferData(gl.ARRAY_BUFFER, idxArr, gl.DYNAMIC_DRAW)
-      const idxLoc = gl.getAttribLocation(program, 'a_index'); if (idxLoc !== -1) { gl.enableVertexAttribArray(idxLoc); gl.vertexAttribPointer(idxLoc, 1, gl.FLOAT, false, 0, 0) }
+      const idxLoc = getAttribLoc('a_index'); if (idxLoc !== -1) { gl.enableVertexAttribArray(idxLoc); gl.vertexAttribPointer(idxLoc, 1, gl.FLOAT, false, 0, 0) }
 
       gl.uniform2f(getLoc('u_resolution'), width, height)
       gl.uniform1f(getLoc('u_time'), (performance.now() - startTimeRef.current) / 1000)
@@ -635,7 +647,7 @@ export const WebGLVisualiser = ({
       gl.drawArrays(gl.POINTS, 0, particlesRef.current.length)
       gl.disableVertexAttribArray(posLoc); if (velLoc !== -1) gl.disableVertexAttribArray(velLoc); if (lifeLoc !== -1) gl.disableVertexAttribArray(lifeLoc); if (sizeLoc !== -1) gl.disableVertexAttribArray(sizeLoc); if (ampLoc !== -1) gl.disableVertexAttribArray(ampLoc); if (idxLoc !== -1) gl.disableVertexAttribArray(idxLoc)
     },
-    [getLoc, handleGradients, getBuffer, getTypedArray]
+    [getLoc, getAttribLoc, handleGradients, getBuffer, getTypedArray]
   )
 
   // Draw radial visualization
@@ -680,15 +692,15 @@ export const WebGLVisualiser = ({
 
       const posBuf = getBuffer(gl, 'radial_pos'); gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
       gl.bufferData(gl.ARRAY_BUFFER, posArr, gl.DYNAMIC_DRAW)
-      const posLoc = gl.getAttribLocation(program, 'a_position'); gl.enableVertexAttribArray(posLoc); gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0)
+      const posLoc = getAttribLoc('a_position'); if (posLoc !== -1) { gl.enableVertexAttribArray(posLoc); gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0) }
 
       const ampBuf = getBuffer(gl, 'radial_amp'); gl.bindBuffer(gl.ARRAY_BUFFER, ampBuf);
       gl.bufferData(gl.ARRAY_BUFFER, ampArr, gl.DYNAMIC_DRAW)
-      const ampLoc = gl.getAttribLocation(program, 'a_amplitude'); if (ampLoc !== -1) { gl.enableVertexAttribArray(ampLoc); gl.vertexAttribPointer(ampLoc, 1, gl.FLOAT, false, 0, 0) }
+      const ampLoc = getAttribLoc('a_amplitude'); if (ampLoc !== -1) { gl.enableVertexAttribArray(ampLoc); gl.vertexAttribPointer(ampLoc, 1, gl.FLOAT, false, 0, 0) }
 
       const idxBuf = getBuffer(gl, 'radial_idx'); gl.bindBuffer(gl.ARRAY_BUFFER, idxBuf);
       gl.bufferData(gl.ARRAY_BUFFER, idxArr, gl.DYNAMIC_DRAW)
-      const idxLoc = gl.getAttribLocation(program, 'a_index'); if (idxLoc !== -1) { gl.enableVertexAttribArray(idxLoc); gl.vertexAttribPointer(idxLoc, 1, gl.FLOAT, false, 0, 0) }
+      const idxLoc = getAttribLoc('a_index'); if (idxLoc !== -1) { gl.enableVertexAttribArray(idxLoc); gl.vertexAttribPointer(idxLoc, 1, gl.FLOAT, false, 0, 0) }
 
       gl.uniform2f(getLoc('u_resolution'), width, height)
       gl.uniform1f(getLoc('u_time'), (performance.now() - startTimeRef.current) / 1000)
@@ -703,7 +715,7 @@ export const WebGLVisualiser = ({
       gl.drawArrays(gl.TRIANGLES, 0, bufferLength * 6)
       gl.disableVertexAttribArray(posLoc); if (ampLoc !== -1) gl.disableVertexAttribArray(ampLoc); if (idxLoc !== -1) gl.disableVertexAttribArray(idxLoc)
     },
-    [getLoc, handleGradients, getBuffer, getTypedArray]
+    [getLoc, getAttribLoc, handleGradients, getBuffer, getTypedArray]
   )
 
   // Draw waveform with 3D effect
@@ -743,15 +755,15 @@ export const WebGLVisualiser = ({
 
       const posBuf = getBuffer(gl, 'wave_pos'); gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
       gl.bufferData(gl.ARRAY_BUFFER, posArr, gl.DYNAMIC_DRAW)
-      const posLoc = gl.getAttribLocation(program, 'a_position'); gl.enableVertexAttribArray(posLoc); gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0)
+      const posLoc = getAttribLoc('a_position'); if (posLoc !== -1) { gl.enableVertexAttribArray(posLoc); gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0) }
 
       const ampBuf = getBuffer(gl, 'wave_amp'); gl.bindBuffer(gl.ARRAY_BUFFER, ampBuf);
       gl.bufferData(gl.ARRAY_BUFFER, ampArr, gl.DYNAMIC_DRAW)
-      const ampLoc = gl.getAttribLocation(program, 'a_amplitude'); if (ampLoc !== -1) { gl.enableVertexAttribArray(ampLoc); gl.vertexAttribPointer(ampLoc, 1, gl.FLOAT, false, 0, 0) }
+      const ampLoc = getAttribLoc('a_amplitude'); if (ampLoc !== -1) { gl.enableVertexAttribArray(ampLoc); gl.vertexAttribPointer(ampLoc, 1, gl.FLOAT, false, 0, 0) }
 
       const idxBuf = getBuffer(gl, 'wave_idx'); gl.bindBuffer(gl.ARRAY_BUFFER, idxBuf);
       gl.bufferData(gl.ARRAY_BUFFER, idxArr, gl.DYNAMIC_DRAW)
-      const idxLoc = gl.getAttribLocation(program, 'a_index'); if (idxLoc !== -1) { gl.enableVertexAttribArray(idxLoc); gl.vertexAttribPointer(idxLoc, 1, gl.FLOAT, false, 0, 0) }
+      const idxLoc = getAttribLoc('a_index'); if (idxLoc !== -1) { gl.enableVertexAttribArray(idxLoc); gl.vertexAttribPointer(idxLoc, 1, gl.FLOAT, false, 0, 0) }
 
       gl.uniform2f(getLoc('u_resolution'), width, height)
       gl.uniform1f(getLoc('u_time'), (performance.now() - startTimeRef.current) / 1000)
@@ -766,7 +778,7 @@ export const WebGLVisualiser = ({
       gl.drawArrays(gl.TRIANGLES, 0, (bufferLength - 1) * 6)
       gl.disableVertexAttribArray(posLoc); if (ampLoc !== -1) gl.disableVertexAttribArray(ampLoc); if (idxLoc !== -1) gl.disableVertexAttribArray(idxLoc)
     },
-    [getLoc, handleGradients, getBuffer, getTypedArray]
+    [getLoc, getAttribLoc, handleGradients, getBuffer, getTypedArray]
   )
 
   // Draw Bleep
@@ -782,7 +794,7 @@ export const WebGLVisualiser = ({
       if (historyRef.current.length > 128) historyRef.current.shift()
 
       gl.bindBuffer(gl.ARRAY_BUFFER, quadBufferRef.current)
-      const posLoc = gl.getAttribLocation(program, 'a_position'); gl.enableVertexAttribArray(posLoc); gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0)
+      const posLoc = getAttribLoc('a_position'); if (posLoc !== -1) { gl.enableVertexAttribArray(posLoc); gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0) }
 
       if (!historyTextureRef.current) historyTextureRef.current = gl.createTexture()
       gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, historyTextureRef.current)
@@ -805,7 +817,7 @@ export const WebGLVisualiser = ({
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
       gl.disableVertexAttribArray(posLoc)
     },
-    [getLoc, handleGradients, getTypedArray]
+    [getLoc, getAttribLoc, handleGradients, getTypedArray]
   )
 
   // Draw Concentric
@@ -822,7 +834,7 @@ export const WebGLVisualiser = ({
       else beatRef.current += avg * sensitivity * 0.1
 
       gl.bindBuffer(gl.ARRAY_BUFFER, quadBufferRef.current)
-      const posLoc = gl.getAttribLocation(program, 'a_position'); gl.enableVertexAttribArray(posLoc); gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0)
+      const posLoc = getAttribLoc('a_position'); if (posLoc !== -1) { gl.enableVertexAttribArray(posLoc); gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0) }
 
       gl.uniform2f(getLoc('u_resolution'), width, height)
       gl.uniform1f(getLoc('u_time'), (performance.now() - startTimeRef.current) / 1000)
@@ -839,7 +851,7 @@ export const WebGLVisualiser = ({
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
       gl.disableVertexAttribArray(posLoc)
     },
-    [getLoc, handleGradients]
+    [getLoc, getAttribLoc, handleGradients]
   )
 
   // Draw Custom / GIF / Matrix Effects
@@ -859,7 +871,7 @@ export const WebGLVisualiser = ({
       const speed = fps / 30.0
 
       gl.bindBuffer(gl.ARRAY_BUFFER, quadBufferRef.current)
-      const posLoc = gl.getAttribLocation(program, 'a_position'); gl.enableVertexAttribArray(posLoc); gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0)
+      const posLoc = getAttribLoc('a_position'); if (posLoc !== -1) { gl.enableVertexAttribArray(posLoc); gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0) }
 
       gl.uniform2f(getLoc('u_resolution'), width, height)
       const timeLoc = getLoc('u_time'); if (timeLoc) {
@@ -986,7 +998,7 @@ export const WebGLVisualiser = ({
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
       gl.disableVertexAttribArray(posLoc)
     },
-    [getLoc, handleGradients, handleTextTexture]
+    [getLoc, getAttribLoc, handleGradients, handleTextTexture]
   )
 
   // Main draw function
@@ -1013,15 +1025,13 @@ export const WebGLVisualiser = ({
     gl.clearColor(0, 0, 0, 0.15); gl.clear(gl.COLOR_BUFFER_BIT)
 
     const currentAudioData = audioDataRef.current
-    if (currentAudioData.length === 0) {
-      if (ppEnabled) {
-        gl.bindFramebuffer(gl.FRAMEBUFFER, null)
-        const bd = beatDataRef.current; pp.updateTime(deltaTime, bd ? { isBeat: bd.isBeat, beatPhase: bd.beatPhase, beatIntensity: bd.beatIntensity } : undefined); pp.render()
-      }
-      animationRef.current = requestAnimationFrame(draw); return
+    let smoothedData: number[] | Float32Array
+    if (currentAudioData.length > 0) {
+      smoothedData = getSmoothData(currentAudioData)
+    } else {
+      if (!zeroArrayRef.current) zeroArrayRef.current = new Float32Array(128).fill(0)
+      smoothedData = zeroArrayRef.current
     }
-
-    const smoothedData = getSmoothData(currentAudioData)
     if (customShader) drawCustom(gl, smoothedData, width, height)
     else {
       switch (visualTypeRef.current) {
@@ -1075,6 +1085,12 @@ export const WebGLVisualiser = ({
     const progRef = programRef
     const gradStrRef = currentGradientStrRef
     const textKeyRef = currentTextKeyRef
+    const locations = locationsRef
+    const attribs = attribLocationsRef
+    const zeros = zeroArrayRef
+    const smooths = smoothedDataArrayRef
+    const melbanks = melbankArrayRef
+    const offscreen = offscreenCanvasRef
 
     return () => {
       if (gl) {
@@ -1111,6 +1127,12 @@ export const WebGLVisualiser = ({
         progRef.current = null
         gradStrRef.current = null
         textKeyRef.current = null
+        locations.current = {}
+        attribs.current = {}
+        zeros.current = null
+        smooths.current = null
+        melbanks.current = null
+        offscreen.current = null
       }
     }
   }, [visualType])

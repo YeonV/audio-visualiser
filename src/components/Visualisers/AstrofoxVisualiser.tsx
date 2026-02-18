@@ -895,8 +895,7 @@ const AstrofoxVisualiser = forwardRef<AstrofoxVisualiserRef, AstrofoxVisualiserP
     // Get or create FFTParser for a layer with frequency filtering
     const getFFTParser = useCallback(
       (layerId: string, minFrequency: number, maxFrequency: number, maxDecibels: number, smoothing: number): FFTParser => {
-        const cacheKey = `${layerId}-${minFrequency}-${maxFrequency}-${maxDecibels}-${smoothing}`
-        let parser = fftParserCache.current.get(cacheKey)
+        let parser = fftParserCache.current.get(layerId)
 
         if (!parser) {
           parser = new FFTParser({
@@ -908,7 +907,14 @@ const AstrofoxVisualiser = forwardRef<AstrofoxVisualiserRef, AstrofoxVisualiserP
             minDecibels: -100,
             smoothingTimeConstant: smoothing,
           })
-          fftParserCache.current.set(cacheKey, parser)
+          fftParserCache.current.set(layerId, parser)
+        } else {
+          parser.updateConfig({
+            minFrequency,
+            maxFrequency,
+            maxDecibels,
+            smoothingTimeConstant: smoothing
+          })
         }
 
         return parser
@@ -919,12 +925,13 @@ const AstrofoxVisualiser = forwardRef<AstrofoxVisualiserRef, AstrofoxVisualiserP
     // Get or create WaveParser for a layer
     const getWaveParser = useCallback(
       (layerId: string, smoothing: number): WaveParser => {
-        const cacheKey = `${layerId}-${smoothing}`
-        let parser = waveParserCache.current.get(cacheKey)
+        let parser = waveParserCache.current.get(layerId)
 
         if (!parser) {
           parser = new WaveParser({ smoothingTimeConstant: smoothing })
-          waveParserCache.current.set(cacheKey, parser)
+          waveParserCache.current.set(layerId, parser)
+        } else {
+          parser.updateConfig({ smoothingTimeConstant: smoothing })
         }
 
         return parser
