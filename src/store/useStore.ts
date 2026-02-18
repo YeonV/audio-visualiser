@@ -36,8 +36,12 @@ const useStore = create(
         name: 'visualiser-storage-v5',
         version: VISUALISER_STORE_VERSION,
         partialize: (state: any) => {
-          // Exclude glContext from persistence as it's a non-serializable WebGL context
-          const { glContext, ...rest } = state
+          // Exclude non-serializable or static metadata from persistence
+          const {
+            glContext,
+            visualizers,
+            ...rest
+          } = state
           return rest
         }
       }

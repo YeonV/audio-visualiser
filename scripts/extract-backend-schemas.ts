@@ -420,10 +420,12 @@ import { VisualizerSchema } from '../../../schemas/base.schema'
 export const VISUALISER_SCHEMAS: Record<string, VisualizerSchema> = {\n`
 
   for (const [key, schema] of Object.entries(schemas)) {
-    const displayName = key.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+    let displayName = key.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+    if (key === 'bladeTexter') displayName = 'Blade Texter'
 
     // UI Tweaks for specific effects
     if (key === 'texter' || key === 'bladeTexter') {
+      if (key === 'bladeTexter') schema.displayName = 'Blade Texter'
       schema.hiddenKeys.push('alpha', 'text_color', 'use_gradient', 'option_1', 'option_2', 'value_option_1', 'resize_method', 'deep_diag', 'background_mode', 'blur', 'height_percent')
       schema.advancedKeys.push('impulse_decay', 'multiplier', 'speed_option_1', 'gradient_roll')
 
