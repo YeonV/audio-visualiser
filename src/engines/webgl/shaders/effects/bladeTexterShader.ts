@@ -32,10 +32,15 @@ export const bladeTexterShader = `
   uniform float u_squeezeY2;
   uniform float u_offsetX2;
   uniform float u_offsetY2;
+  uniform float u_speed2;
 
   uniform sampler2D u_gradient;
   uniform bool u_useGradient;
   uniform float u_gradientRoll;
+
+  uniform sampler2D u_gradient2;
+  uniform bool u_useGradient2;
+  uniform float u_gradientRoll2;
 
   uniform float u_zoom;
   uniform float u_squeezeX;
@@ -119,36 +124,36 @@ export const bladeTexterShader = `
     textUV2.y += yOffset2;
     textUV2.y = 1.0 - textUV2.y;
     if (u_textEffect2 == 0) {
-      textUV2.x += mod(u_time * u_speed, 1.0);
+      textUV2.x += mod(u_time * u_speed2, 1.0);
       textUV2.x = mod(textUV2.x, 1.0);
     } else if (u_textEffect2 == 1) {
       float angle2 = atan(uv2.y, uv2.x);
       float spokes2 = 8.0;
       float spoke2 = floor((angle2 + 3.14159) / (6.28318 / spokes2));
-      float t2 = mod(u_time * u_speed + spoke2 / spokes2, 1.0);
+      float t2 = mod(u_time * u_speed2 + spoke2 / spokes2, 1.0);
       textUV2.x += t2;
       textUV2.x = mod(textUV2.x, 1.0);
     } else if (u_textEffect2 == 2) {
       float r2 = length(uv2);
-      float theta2 = atan(uv2.y, uv2.x) + u_time * u_speed;
+      float theta2 = atan(uv2.y, uv2.x) + u_time * u_speed2;
       textUV2.x = 0.5 + r2 * cos(theta2) * 0.5;
       textUV2.y = 0.5 + r2 * sin(theta2) * 0.5;
     } else if (u_textEffect2 == 3) {
-      textUV2.y += sin(textUV2.x * 10.0 + u_time * u_speed) * 0.05;
+      textUV2.y += sin(textUV2.x * 10.0 + u_time * u_speed2) * 0.05;
     } else if (u_textEffect2 == 4) {
-      float pulse2 = 0.5 + 0.5 * sin(u_time * u_speed * 2.0);
+      float pulse2 = 0.5 + 0.5 * sin(u_time * u_speed2 * 2.0);
       textUV2.y = (textUV2.y - 0.5) * (0.8 + 0.4 * pulse2) + 0.5;
     } else if (u_textEffect2 == 5) {
-      float fade2 = 0.5 + 0.5 * sin(u_time * u_speed * 2.0);
+      float fade2 = 0.5 + 0.5 * sin(u_time * u_speed2 * 2.0);
       textUV2.x = (textUV2.x - 0.5) * (0.8 + 0.4 * fade2) + 0.5;
     }
     vec4 texColor2 = texture2D(u_textTexture2, textUV2);
     // If out of bounds, force alpha to 0
     if (textUV2.x < 0.0 || textUV2.x > 1.0 || textUV2.y < 0.0 || textUV2.y > 1.0) {
       texColor2 = vec4(0.0);
-    } else if (u_useGradient) {
-      float gradPos2 = mod(textUV2.x + u_gradientRoll, 1.0);
-      vec3 gradColor2 = texture2D(u_gradient, vec2(gradPos2, 0.5)).rgb;
+    } else if (u_useGradient2) {
+      float gradPos2 = mod(textUV2.x + u_gradientRoll2, 1.0);
+      vec3 gradColor2 = texture2D(u_gradient2, vec2(gradPos2, 0.5)).rgb;
       texColor2.rgb *= gradColor2;
     }
 

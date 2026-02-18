@@ -105,9 +105,11 @@ export const WebGLVisualiser = ({
   const melbankTextureRef = useRef<WebGLTexture | null>(null)
   const historyTextureRef = useRef<WebGLTexture | null>(null)
   const gradientTextureRef = useRef<WebGLTexture | null>(null)
+  const gradientTexture2Ref = useRef<WebGLTexture | null>(null)
   const textTextureRef = useRef<WebGLTexture | null>(null)
   const textTexture2Ref = useRef<WebGLTexture | null>(null)
   const currentGradientStrRef = useRef<string | null>(null)
+  const currentGradient2StrRef = useRef<string | null>(null)
   const currentTextKeyRef = useRef<string | null>(null)
   const currentTextKey2Ref = useRef<string | null>(null)
   const animationRef = useRef<number | undefined>(undefined)
@@ -267,6 +269,7 @@ export const WebGLVisualiser = ({
 
   // Helper to handle gradient uniforms
   const handleGradients = useCallback((gl: WebGLRenderingContext, cfg: any) => {
+    // Layer 1
     const useGradLoc = getLoc('u_useGradient')
     const gradLoc = getLoc('u_gradient')
     const gradRollLoc = getLoc('u_gradientRoll')
@@ -290,6 +293,32 @@ export const WebGLVisualiser = ({
       }
     } else if (useGradLoc) {
       gl.uniform1i(useGradLoc, 0)
+    }
+
+    // Layer 2 (BladeTexter)
+    const useGrad2Loc = getLoc('u_useGradient2')
+    const grad2Loc = getLoc('u_gradient2')
+    const gradRoll2Loc = getLoc('u_gradientRoll2')
+
+    if (grad2Loc && cfg.gradient2) {
+      if (!gradientTexture2Ref.current) {
+        gradientTexture2Ref.current = gl.createTexture()
+        currentGradient2StrRef.current = null
+      }
+      if (currentGradient2StrRef.current !== cfg.gradient2) {
+        const gradData = parseGradient(cfg.gradient2); gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D, gradientTexture2Ref.current)
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 256, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, gradData)
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+        currentGradient2StrRef.current = cfg.gradient2
+      }
+      gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D, gradientTexture2Ref.current); gl.uniform1i(grad2Loc, 4)
+      if (useGrad2Loc) gl.uniform1i(useGrad2Loc, 1)
+      if (gradRoll2Loc) {
+        const rollSpeed = cfg.gradient_roll2 ?? 0
+        gl.uniform1f(gradRoll2Loc, ((performance.now() - startTimeRef.current) / 1000 * rollSpeed) % 1.0)
+      }
+    } else if (useGrad2Loc) {
+      gl.uniform1i(useGrad2Loc, 0)
     }
   }, [getLoc])
 
@@ -992,6 +1021,7 @@ export const WebGLVisualiser = ({
           gl.uniform1f(getLoc('u_squeezeY2'), cfg.stretch_y2 ?? 1.0)
           gl.uniform1f(getLoc('u_offsetX2'), cfg.offset_x2 ?? 0.0)
           gl.uniform1f(getLoc('u_offsetY2'), cfg.offset_y2 ?? 0.0)
+          gl.uniform1f(getLoc('u_speed2'), cfg.speed2 ?? 1.0)
         }
 
         handleTextTexture(gl, cfg)
@@ -1094,6 +1124,7 @@ export const WebGLVisualiser = ({
     const buffers = buffersRef.current
     const typedArrays = typedArraysRef.current
     const gradTexRef = gradientTextureRef
+    const gradTex2Ref = gradientTexture2Ref
     const melTexRef = melbankTextureRef
     const histTexRef = historyTextureRef
     const textTexRef = textTextureRef
@@ -1119,6 +1150,7 @@ export const WebGLVisualiser = ({
         const program = progRef.current
 
         if (gradTex) gl.deleteTexture(gradTex)
+        if (gradTex2Ref.current) gl.deleteTexture(gradTex2Ref.current)
         if (melTex) gl.deleteTexture(melTex)
         if (histTex) gl.deleteTexture(histTex)
         if (textTex) gl.deleteTexture(textTex)
@@ -1138,6 +1170,7 @@ export const WebGLVisualiser = ({
         typedArrays.clear()
 
         gradTexRef.current = null
+        gradTex2Ref.current = null
         melTexRef.current = null
         histTexRef.current = null
         textTexRef.current = null
