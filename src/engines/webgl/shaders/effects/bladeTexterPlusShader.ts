@@ -69,9 +69,9 @@ export const bladeTexterPlusShader = `
       float v = sin(uv.x * 10.0 + u_time) + sin((uv.y + u_time) * 10.0) + sin((uv.x + uv.y + u_time) * 10.0);
       return mix(u_primaryColor, u_secondaryColor, sin(v) * 0.5 + 0.5);
     } else if (u_backgroundMode == 2) { // Grid
-      vec2 g = abs(fract(uv * 10.0 - 0.5) - 0.5) / fwidth(uv * 10.0);
+      vec2 g = abs(fract(uv * 10.0 - 0.5) - 0.5);
       float line = min(g.x, g.y);
-      return vec3(1.0 - smoothstep(0.0, 1.0, line)) * u_primaryColor;
+      return vec3(1.0 - smoothstep(0.0, 0.05, line)) * u_primaryColor;
     } else if (u_backgroundMode == 3) { // Audio Wave
       float dist = abs(uv.y - sin(uv.x * 5.0 + u_time) * u_energy * 0.5);
       return u_secondaryColor * (0.01 / dist);
@@ -133,40 +133,38 @@ export const bladeTexterPlusShader = `
     vec4 finalTex = vec4(0.0);
     float offset = u_chromaticAberration;
 
-    // Sample Loop
-    for(int i = 0; i < 2; i++) {
-        sampler2D t = (i == 0) ? u_textTexture : u_textTexture2;
-        int eff = (i == 0) ? u_textEffect : u_textEffect2;
-        float spd = (i == 0) ? u_speed : u_speed2;
-        sampler2D grd = (i == 0) ? u_gradient : u_gradient2;
-        bool useG = (i == 0) ? u_useGradient : u_useGradient2;
-        float gR = (i == 0) ? u_gradientRoll : u_gradientRoll2;
-        float z = (i == 0) ? u_zoom : u_zoom * 0.8; // Small offset for 2nd layer
-
-        // Ray-Plane intersection for 3D effect
+    // Unrolled Layer Pass 1
+    {
         vec3 p = rd * rot * (1.0 / u_zoom);
         vec2 planeUV = p.xy / p.z;
-
         if (p.z > 0.0) {
-            vec4 r = sampleText(t, planeUV + vec2(offset, 0), eff, spd, grd, useG, gR);
-            vec4 g = sampleText(t, planeUV, eff, spd, grd, useG, gR);
-            vec4 b = sampleText(t, planeUV - vec2(offset, 0), eff, spd, grd, useG, gR);
-
+            vec4 r = sampleText(u_textTexture, planeUV + vec2(offset, 0), u_textEffect, u_speed, u_gradient, u_useGradient, u_gradientRoll);
+            vec4 g = sampleText(u_textTexture, planeUV, u_textEffect, u_speed, u_gradient, u_useGradient, u_gradientRoll);
+            vec4 b = sampleText(u_textTexture, planeUV - vec2(offset, 0), u_textEffect, u_speed, u_gradient, u_useGradient, u_gradientRoll);
             vec4 layerCol = vec4(r.r, g.g, b.b, max(max(r.a, g.a), b.a));
-
-            // Hyper Glow
-            float glow = layerCol.a * u_glowIntensity * (1.0 + u_energy);
-            layerCol.rgb += layerCol.rgb * glow;
-
-            // Glitch
+            layerCol.rgb += layerCol.rgb * layerCol.a * u_glowIntensity * (1.0 + u_energy);
             if (u_glitchAmount > 0.0) {
                float n = hash(vec2(floor(u_time * 15.0), floor(uv.y * 10.0)));
-               if (n < u_glitchAmount * 0.2) {
-                   layerCol.rgb = layerCol.gbr;
-                   planeUV.x += (n - 0.5) * 0.1;
-               }
+               if (n < u_glitchAmount * 0.2) { layerCol.rgb = layerCol.gbr; }
             }
+            finalTex = mix(finalTex, layerCol, layerCol.a);
+        }
+    }
 
+    // Unrolled Layer Pass 2
+    {
+        vec3 p = rd * rot * (1.0 / (u_zoom * 0.8));
+        vec2 planeUV = p.xy / p.z;
+        if (p.z > 0.0) {
+            vec4 r = sampleText(u_textTexture2, planeUV + vec2(offset, 0), u_textEffect2, u_speed2, u_gradient2, u_useGradient2, u_gradientRoll2);
+            vec4 g = sampleText(u_textTexture2, planeUV, u_textEffect2, u_speed2, u_gradient2, u_useGradient2, u_gradientRoll2);
+            vec4 b = sampleText(u_textTexture2, planeUV - vec2(offset, 0), u_textEffect2, u_speed2, u_gradient2, u_useGradient2, u_gradientRoll2);
+            vec4 layerCol = vec4(r.r, g.g, b.b, max(max(r.a, g.a), b.a));
+            layerCol.rgb += layerCol.rgb * layerCol.a * u_glowIntensity * (1.0 + u_energy);
+            if (u_glitchAmount > 0.0) {
+               float n = hash(vec2(floor(u_time * 15.0 + 1.0), floor(uv.y * 10.0)));
+               if (n < u_glitchAmount * 0.2) { layerCol.rgb = layerCol.gbr; }
+            }
             finalTex = mix(finalTex, layerCol, layerCol.a);
         }
     }

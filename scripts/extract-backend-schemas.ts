@@ -518,6 +518,9 @@ export const VISUALISER_SCHEMAS: Record<string, VisualizerSchema> = {\n`
           { id: 'flip_vertical2', title: 'Flip Vertical 2', type: 'boolean', default: false },
           { id: 'rotate2', title: 'Rotate 2', type: 'integer', default: 0, min: 0, max: 360, step: 1 }
         )
+      } else {
+        // Texter cleanup: remove any fields that might have leaked from Blade Texter additions
+        schema.hiddenKeys.push('text2', 'font2', 'text_effect2', 'speed2', 'gradient2', 'use_gradient2', 'gradient_roll2', 'zoom2', 'stretch_x2', 'stretch_y2', 'offset_x2', 'offset_y2', 'flip_horizontal2', 'flip_vertical2', 'rotate2')
       }
 
       schema.fields.push(...extraFields)
