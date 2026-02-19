@@ -148,7 +148,7 @@ const HexGridVisualiser: React.FC<HexGridProps> = ({
     rippleTimeRef.current += 0.016 * cfg.rippleSpeed
 
     // Process audio data
-    const dataArray = Array.isArray(audioData) ? audioData : Array.from(audioData)
+    const dataArray = audioData
     const dataLen = dataArray.length || 1
 
     // Calculate frequency bands if not provided

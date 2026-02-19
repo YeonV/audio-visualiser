@@ -6,7 +6,7 @@
  */
 
 // Utility functions
-export { createShader, createProgram, hexToRgb } from './utils'
+export { createShader, createProgram, hexToRgb, deleteProgramAndShaders } from './utils'
 
 // Base shaders
 export {
@@ -18,34 +18,7 @@ export {
 } from './base'
 
 // Effect shaders
-export {
-  quadVertexShader,
-  bleepFragmentShader,
-  concentricFragmentShader,
-  gifFragmentShader,
-  matrixRainShader,
-  terrainShader,
-  geometricShader,
-  gameOfLifeShader,
-  digitalRainShader,
-  flameShader,
-  plasma2dShader,
-  equalizer2dShader,
-  noise2dShader,
-  blenderShader,
-  cloneShader,
-  bandsShader,
-  bandsMatrixShader,
-  blocksShader,
-  keybeat2dShader,
-  // texterShader,
-  plasmaWled2dShader,
-  radialShader,
-  soapShader,
-  waterfallShader,
-  imageShader
-} from './effects'
-export { texterShader } from './effects/texterShader'
+export * from './effects'
 
 // Advanced shaders
 export * from './advanced'

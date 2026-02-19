@@ -420,16 +420,32 @@ import { VisualizerSchema } from '../../../schemas/base.schema'
 export const VISUALISER_SCHEMAS: Record<string, VisualizerSchema> = {\n`
 
   for (const [key, schema] of Object.entries(schemas)) {
-    const displayName = key.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+    let displayName = key.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+    if (key === 'bladeTexter') displayName = 'Blade Texter'
 
     // UI Tweaks for specific effects
-    if (key === 'texter') {
+    if (key === 'texter' || key === 'bladeTexter') {
+      if (key === 'bladeTexter') schema.displayName = 'Blade Texter'
       schema.hiddenKeys.push('alpha', 'text_color', 'use_gradient', 'option_1', 'option_2', 'value_option_1', 'resize_method', 'deep_diag', 'background_mode', 'blur', 'height_percent')
-      schema.advancedKeys.push('impulse_decay', 'multiplier', 'speed_option_1', 'gradient_roll')
+
+      if (key === 'bladeTexter') {
+        schema.advancedKeys.push('impulse_decay', 'multiplier', 'gradient_roll')
+      } else {
+        schema.advancedKeys.push('impulse_decay', 'multiplier', 'speed_option_1', 'gradient_roll')
+      }
 
       // Add zoom, squeeze_x, squeeze_y, offset_x, offset_y fields for new shader controls (no height_percent)
       schema.fields = schema.fields.filter(f => f.id !== 'height_percent')
-      schema.fields.push(
+
+      if (key === 'bladeTexter') {
+        const speed1Field = schema.fields.find(f => f.id === 'speed_option_1')
+        if (speed1Field) {
+          speed1Field.title = 'Speed'
+          speed1Field.default = 0.1
+        }
+      }
+
+      const extraFields: SchemaField[] = [
         {
           id: 'zoom',
           title: 'Zoom',
@@ -470,18 +486,76 @@ export const VISUALISER_SCHEMAS: Record<string, VisualizerSchema> = {\n`
           id: 'offset_y',
           title: 'Offset Y',
           type: 'number',
-          default: 0.0,
+          default: key === 'bladeTexter' ? 0.4 : 0.0,
           min: -2.0,
           max: 2.0,
           step: 0.01
         }
-      )
+      ]
+
+      if (key === 'bladeTexter') {
+        extraFields.push(
+          { id: 'text2', title: 'Text 2', type: 'string', default: 'hacked the visualyzer' },
+          { id: 'font2', title: 'Font 2', type: 'string', default: 'Press Start 2P', enum: ["Press Start 2P", "Blade-5x8", "8bitOperatorPlus8-Regular", "Roboto-Black", "Roboto-Bold", "Roboto-Regular", "Stop", "technique"] },
+          { id: 'text_effect2', title: 'Text Effect 2', type: 'string', default: 'Side Scroll', enum: ["Side Scroll", "Spokes", "Carousel", "Wave", "Pulse", "Fade"] },
+          { id: 'speed2', title: 'Speed 2', type: 'number', default: 0.1, min: 0.0, max: 10.0, step: 0.01 },
+          {
+            id: 'gradient2',
+            title: 'Gradient 2',
+            type: 'color',
+            gradient: true,
+            default: 'linear-gradient(90deg, rgb(255, 0, 0) 0%, rgb(255, 128, 0) 100%)'
+          },
+          { id: 'use_gradient2', title: 'Use Gradient 2', type: 'boolean', default: true },
+          { id: 'gradient_roll2', title: 'Gradient Roll 2', type: 'number', default: 0, min: 0, max: 10, step: 0.1 },
+          { id: 'zoom2', title: 'Zoom 2', type: 'number', default: 1.0, min: 0.1, max: 5.0, step: 0.01 },
+          { id: 'stretch_x2', title: 'Stretch X 2', type: 'number', default: 1.0, min: 0.1, max: 5.0, step: 0.01 },
+          { id: 'stretch_y2', title: 'Stretch Y 2', type: 'number', default: 1.0, min: 0.1, max: 5.0, step: 0.01 },
+          { id: 'offset_x2', title: 'Offset X 2', type: 'number', default: 0.0, min: -2.0, max: 2.0, step: 0.01 },
+          { id: 'offset_y2', title: 'Offset Y 2', type: 'number', default: -0.4, min: -2.0, max: 2.0, step: 0.01 },
+          { id: 'flip_horizontal2', title: 'Flip Horizontal 2', type: 'boolean', default: false },
+          { id: 'flip_vertical2', title: 'Flip Vertical 2', type: 'boolean', default: false },
+          { id: 'rotate2', title: 'Rotate 2', type: 'integer', default: 0, min: 0, max: 360, step: 1 }
+        )
+      }
+
+      schema.fields.push(...extraFields)
+
       schema.defaults.font_size = 240
       schema.defaults.zoom = 1.0
       schema.defaults.stretch_x = 1.0
       schema.defaults.stretch_y = 1.0
       schema.defaults.offset_x = 0.0
-      schema.defaults.offset_y = 0.0
+      schema.defaults.offset_y = key === 'bladeTexter' ? 0.4 : 0.0
+
+      if (key === 'bladeTexter') {
+        const setPropDefault = (id: string, val: any) => {
+          const field = schema.fields.find(f => f.id === id)
+          if (field) field.default = val
+          schema.defaults[id] = val
+        }
+
+        setPropDefault('text', 'Blade')
+        setPropDefault('text_effect', 'Fade')
+        setPropDefault('gradient', 'linear-gradient(90deg, rgb(0, 0, 255) 0%, rgb(0, 255, 255) 100%)')
+        setPropDefault('speed_option_1', 0.1)
+        setPropDefault('offset_y', 0.4)
+
+        setPropDefault('text2', 'hacked the visualyzer')
+        setPropDefault('text_effect2', 'Side Scroll')
+        setPropDefault('speed2', 0.1)
+        setPropDefault('gradient2', 'linear-gradient(90deg, rgb(255, 0, 0) 0%, rgb(255, 128, 0) 100%)')
+        setPropDefault('use_gradient2', true)
+        setPropDefault('font2', 'Press Start 2P')
+        setPropDefault('zoom2', 1.0)
+        setPropDefault('stretch_x2', 1.0)
+        setPropDefault('stretch_y2', 1.0)
+        setPropDefault('offset_x2', 0.0)
+        setPropDefault('offset_y2', -0.4)
+        setPropDefault('flip_horizontal2', false)
+        setPropDefault('flip_vertical2', false)
+        setPropDefault('rotate2', 0)
+      }
     }
 
     output += `  "${key}": {\n`
@@ -672,6 +746,13 @@ async function main() {
       
       // Save updated cache
       await saveCache(newCache)
+    }
+
+    // Duplicate texter to bladeTexter if it exists
+    if (schemas['texter']) {
+      console.log('✨ Duplicating texter to bladeTexter...')
+      schemas['bladeTexter'] = JSON.parse(JSON.stringify(schemas['texter']))
+      originalNames['bladeTexter'] = originalNames['texter'] || 'texter2d'
     }
 
     // Report statistics

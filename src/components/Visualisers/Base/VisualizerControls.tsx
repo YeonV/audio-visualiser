@@ -55,7 +55,7 @@ interface VisualizerControlsProps {
   startSystemAudio?: () => Promise<void>
 }
 
-const VisualizerControls: React.FC<VisualizerControlsProps> = ({
+const VisualizerControls: React.FC<VisualizerControlsProps> = React.memo(({
   onClose,
   micError,
   isListening,
@@ -270,6 +270,6 @@ const VisualizerControls: React.FC<VisualizerControlsProps> = ({
       </Box>
     </Box>
   )
-}
+})
 
 export default VisualizerControls

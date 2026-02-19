@@ -1,3 +1,4 @@
+import React, { memo, useCallback, useState, useEffect } from 'react'
 import { Box, Slider, Stack, Typography, Checkbox, FormControlLabel, TextField, MenuItem, Select } from '@mui/material'
 
 interface SimpleConfigFormProps {
@@ -8,10 +9,10 @@ interface SimpleConfigFormProps {
 
 // Simple fallback form for standalone mode
 // Improved to support dynamic schemas if available
-const SimpleConfigForm = ({ config, onChange, schema }: SimpleConfigFormProps) => {
-  const handleChange = (key: string, value: any) => {
+const SimpleConfigForm = memo(({ config, onChange, schema }: SimpleConfigFormProps) => {
+  const handleChange = useCallback((key: string, value: any) => {
     onChange({ [key]: value })
-  }
+  }, [onChange])
 
   // If we have a schema, render a dynamic form
   if (schema && schema.properties) {
@@ -93,14 +94,11 @@ const SimpleConfigForm = ({ config, onChange, schema }: SimpleConfigFormProps) =
           if (prop.type === 'string' || prop.type === 'autocomplete') {
              return (
                <Box key={key}>
-                 <TextField
-                   fullWidth
+                 <StringField
                    label={prop.title || key}
                    value={config[key] ?? prop.default ?? ''}
-                   onChange={(e) => handleChange(key, e.target.value)}
-                   size="small"
-                   variant="outlined"
-                   helperText={prop.description}
+                   onChange={(val) => handleChange(key, val)}
+                   description={prop.description}
                  />
                </Box>
              )
@@ -160,6 +158,48 @@ const SimpleConfigForm = ({ config, onChange, schema }: SimpleConfigFormProps) =
       </Box>
     </Stack>
   )
-}
+})
+
+// Helper component for string fields to avoid infinite loops and provide better performance
+const StringField = memo(({ label, value, onChange, description }: { label: string, value: string, onChange: (val: string) => void, description?: string }) => {
+  const [localValue, setLocalValue] = useState(value)
+
+  // Sync local value with prop if prop changes from outside
+  useEffect(() => {
+    setLocalValue(value)
+  }, [value])
+
+  const handleBlur = () => {
+    if (localValue !== value) {
+      onChange(localValue)
+    }
+  }
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setLocalValue(e.target.value)
+    // Optional: immediate update for some fields, but blur is safer for loops
+    // onChange(e.target.value)
+  }
+
+  return (
+    <TextField
+      fullWidth
+      label={label}
+      value={localValue}
+      onChange={handleChange}
+      onBlur={handleBlur}
+      size="small"
+      variant="outlined"
+      helperText={description}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          handleBlur()
+        }
+      }}
+    />
+  )
+})
+
+SimpleConfigForm.displayName = 'SimpleConfigForm'
 
 export default SimpleConfigForm
