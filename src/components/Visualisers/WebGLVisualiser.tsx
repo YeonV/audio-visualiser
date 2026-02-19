@@ -33,6 +33,7 @@ import {
   keybeat2dShader,
   texterShader,
   bladeTexterShader,
+  bladeTexterPlusShader,
   plasmaWled2dShader,
   radialShader,
   soapShader,
@@ -450,6 +451,9 @@ export const WebGLVisualiser = ({
       } else if (type === 'bladeTexter') {
         vertexSource = quadVertexShader
         fragmentSource = bladeTexterShader
+      } else if (type === 'bladeTexterPlus') {
+        vertexSource = quadVertexShader
+        fragmentSource = bladeTexterPlusShader
       } else if (type === 'plasmawled2d') {
         vertexSource = quadVertexShader
         fragmentSource = plasmaWled2dShader
@@ -1035,7 +1039,7 @@ export const WebGLVisualiser = ({
       gl.uniform1f(getLoc('u_flip'), (cfg.align === 'invert' || cfg.flip) ? 1.0 : 0.0)
       gl.uniform1f(getLoc('u_blockSize'), cfg.block_count ?? cfg.block_size ?? 10.0)
       gl.uniform1f(getLoc('u_keys'), (cfg.stretch_horizontal / 6.25) || (cfg.keys ?? 16.0))
-      if (currentVisualType === 'texter' || currentVisualType === 'bladeTexter') {
+      if (currentVisualType === 'texter' || currentVisualType === 'bladeTexter' || currentVisualType === 'bladeTexterPlus') {
         // Native baseline: zoom, stretch_x, stretch_y, offset_x, offset_y are direct multipliers (1.0 = native, no inversion)
         const zoom = typeof cfg.zoom === 'number' ? cfg.zoom : 1.0;
         const stretchX = typeof cfg.stretch_x === 'number' ? cfg.stretch_x : 1.0;
@@ -1063,6 +1067,26 @@ export const WebGLVisualiser = ({
           gl.uniform1f(getLoc('u_offsetX2'), cfg.offset_x2 ?? 0.0)
           gl.uniform1f(getLoc('u_offsetY2'), cfg.offset_y2 ?? 0.0)
           gl.uniform1f(getLoc('u_speed2'), cfg.speed2 ?? 1.0)
+        }
+
+        if (currentVisualType === 'bladeTexterPlus') {
+          gl.uniform1f(getLoc('u_rotationX'), (cfg.rotation_x ?? 0) * Math.PI)
+          gl.uniform1f(getLoc('u_rotationY'), (cfg.rotation_y ?? 0) * Math.PI)
+          gl.uniform1f(getLoc('u_rotationZ'), cfg.rotation_z ?? 0)
+          gl.uniform1f(getLoc('u_perspective'), cfg.perspective ?? 1.0)
+          gl.uniform1f(getLoc('u_glowIntensity'), cfg.glow_intensity ?? 0.5)
+          gl.uniform1f(getLoc('u_glitchAmount'), cfg.glitch_amount ?? 0.1)
+          gl.uniform1f(getLoc('u_chromaticAberration'), cfg.chromatic_aberration ?? 0.02)
+          gl.uniform1f(getLoc('u_pixelate'), cfg.pixelate ?? 0.0)
+          gl.uniform1f(getLoc('u_bgOpacity'), cfg.bg_opacity ?? 0.3)
+          gl.uniform1f(getLoc('u_audioPulse'), cfg.audio_reactive_scale ?? 0.5)
+
+          const bgMap: Record<string, number> = { 'None': 0, 'Plasma': 1, 'Grid': 2, 'Audio Wave': 3, 'Starfield': 4 }
+          gl.uniform1i(getLoc('u_backgroundMode'), bgMap[cfg.background_mode] ?? 1)
+
+          // Re-map speed if needed (schema uses 'speed' for layer 1)
+          gl.uniform1f(getLoc('u_speed'), cfg.speed ?? 0.1)
+          gl.uniform1f(getLoc('u_speed2'), cfg.speed2 ?? 0.1)
         }
 
         handleTextTexture(gl, cfg)

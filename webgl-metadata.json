@@ -177,6 +177,12 @@
       "description": "Enhanced scrolling text display for LED matrix",
       "tags": ["2d", "matrix", "text", "scroll", "blade"]
     },
+    "bladeTexterPlus": {
+      "displayName": "Blade Texter Plus",
+      "category": "Matrix Effects",
+      "description": "The ultimate text visualization experience with 3D projection and advanced post-processing.",
+      "tags": ["3d", "text", "advanced", "glow", "plus"]
+    },
     "waterfall": {
       "displayName": "Waterfall",
       "category": "Matrix Effects",
