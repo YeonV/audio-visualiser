@@ -68,6 +68,10 @@ const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({
   const setShowFxPanel = useStore(state => state.setShowFxPanel)
   const ppConfig = useStore(state => state.ppConfig)
   const updatePpConfig = useStore(state => state.updatePpConfig)
+  const globalSmoothing = useStore(state => state.globalSmoothing)
+  const setGlobalSmoothing = useStore(state => state.setGlobalSmoothing)
+  const whiteCircleFix = useStore(state => state.whiteCircleFix)
+  const setWhiteCircleFix = useStore(state => state.setWhiteCircleFix)
 
   const setFluidConfig = (update: any) => {
     updateVisualizerConfig('fluid', typeof update === 'function' ? update(fluidConfig) : update)
@@ -519,6 +523,50 @@ const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({
             )}
           </Box>
         )}
+
+        <Divider sx={{ my: 3 }} />
+
+        <Box sx={{ mt: 2 }}>
+          <Typography variant="subtitle2" sx={{ mb: 2 }}>
+            Global Fixes & Performance
+          </Typography>
+
+          <Box sx={{ mb: 3 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+              <Typography variant="body2">Audio Smoothing</Typography>
+              <Typography variant="caption" color="text.secondary">
+                {(globalSmoothing * 100).toFixed(0)}%
+              </Typography>
+            </Box>
+            <Slider
+              size="small"
+              min={0}
+              max={0.99}
+              step={0.01}
+              value={globalSmoothing}
+              onChange={(_, val) => setGlobalSmoothing(val as number)}
+            />
+          </Box>
+
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="body2" sx={{ mb: 1 }}>White Circle Fix Mode</Typography>
+            <Grid container spacing={1}>
+              {['original', 'energy', 'clamp'].map((mode) => (
+                <Grid size={{ xs: 4 }} key={mode}>
+                  <Button
+                    fullWidth
+                    variant={whiteCircleFix === mode ? 'contained' : 'outlined'}
+                    size="small"
+                    onClick={() => setWhiteCircleFix(mode as any)}
+                    sx={{ textTransform: 'capitalize', fontSize: '0.7rem' }}
+                  >
+                    {mode}
+                  </Button>
+                </Grid>
+              ))}
+            </Grid>
+          </Box>
+        </Box>
       </CardContent>
     </Card>
   )

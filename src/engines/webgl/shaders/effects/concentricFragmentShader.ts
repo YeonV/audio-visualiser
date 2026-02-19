@@ -6,6 +6,8 @@ export const concentricFragmentShader = `
   uniform vec3 u_secondaryColor;
   uniform float u_time;
   uniform float u_beat; // Accumulating beat/power value
+  uniform float u_energy;
+  uniform int u_fixMode;
 
   varying vec2 v_position;
 
@@ -25,9 +27,17 @@ export const concentricFragmentShader = `
     // Modulate brightness
     color *= (ring * 0.8 + 0.2);
 
+    // Pulse
+    float pulse = 1.0;
+    if (u_fixMode == 0) pulse = 1.0 + u_beat * 0.1;
+    else if (u_fixMode == 1) pulse = 1.0 + u_energy * 0.8;
+    else pulse = 1.0 + u_beat * 0.8;
+    color *= pulse;
+
     // Vignette
     color *= 1.0 - smoothstep(0.5, 1.5, dist);
 
+    if (u_fixMode > 0) color = clamp(color, 0.0, 1.0);
     gl_FragColor = vec4(color, 1.0);
   }
 `

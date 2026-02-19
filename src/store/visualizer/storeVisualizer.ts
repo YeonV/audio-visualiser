@@ -13,6 +13,8 @@ export interface StoreVisualizerState {
   audioSource: 'backend' | 'mic' | 'system'
   autoChange: boolean
   isPlaying: boolean
+  globalSmoothing: number
+  whiteCircleFix: 'original' | 'energy' | 'clamp'
 }
 
 export interface StoreVisualizerActions {
@@ -21,6 +23,8 @@ export interface StoreVisualizerActions {
   setAutoChange: (enabled: boolean) => void
   setIsPlaying: (playing: boolean) => void
   togglePlay: () => void
+  setGlobalSmoothing: (value: number) => void
+  setWhiteCircleFix: (mode: 'original' | 'energy' | 'clamp') => void
 }
 
 const storeVisualizer = (set: any, get: any) => {
@@ -32,13 +36,17 @@ const storeVisualizer = (set: any, get: any) => {
     audioSource: 'backend' as 'backend' | 'mic' | 'system',
     autoChange: false,
     isPlaying: true,
+    globalSmoothing: 0.5,
+    whiteCircleFix: 'energy' as 'original' | 'energy' | 'clamp',
 
     // Actions
     setVisualType: (type: VisualisationType) => set({ visualType: type }),
     setAudioSource: (source: 'backend' | 'mic' | 'system') => set({ audioSource: source }),
     setAutoChange: (enabled: boolean) => set({ autoChange: enabled }),
     setIsPlaying: (playing: boolean) => set({ isPlaying: playing }),
-    togglePlay: () => set((state: any) => ({ isPlaying: !state.isPlaying }))
+    togglePlay: () => set((state: any) => ({ isPlaying: !state.isPlaying })),
+    setGlobalSmoothing: (value: number) => set({ globalSmoothing: value }),
+    setWhiteCircleFix: (mode: 'original' | 'energy' | 'clamp') => set({ whiteCircleFix: mode })
     }
 }
 

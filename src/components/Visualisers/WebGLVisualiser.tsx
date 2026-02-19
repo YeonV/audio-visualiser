@@ -41,6 +41,7 @@ import {
 } from '../../engines/webgl/shaders'
 import type { WebGLVisualiserId } from '../../_generated/webgl'
 import { parseGradient } from '../../utils/gradient'
+import { useStore } from '../../store'
 
 export type WebGLVisualisationType = WebGLVisualiserId
 
@@ -99,6 +100,9 @@ export const WebGLVisualiser = ({
   postProcessingEnabled = false,
   onContextCreated
 }: WebGLVisualiserProps) => {
+  const globalSmoothing = useStore(state => state.globalSmoothing)
+  const whiteCircleFix = useStore(state => state.whiteCircleFix)
+
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const glRef = useRef<WebGLRenderingContext | null>(null)
   const programRef = useRef<WebGLProgram | null>(null)
@@ -176,6 +180,14 @@ export const WebGLVisualiser = ({
     audioDataRef.current = audioData
     visualTypeRef.current = visualType
   }, [postProcessing, postProcessingEnabled, onContextCreated, beatData, frequencyBands, config, audioData, visualType])
+
+  const globalSmoothingRef = useRef(globalSmoothing)
+  const whiteCircleFixRef = useRef(whiteCircleFix)
+
+  useEffect(() => {
+    globalSmoothingRef.current = globalSmoothing
+    whiteCircleFixRef.current = whiteCircleFix
+  }, [globalSmoothing, whiteCircleFix])
 
   // Update theme colors
   useEffect(() => {
@@ -469,7 +481,7 @@ export const WebGLVisualiser = ({
   // Apply smoothing
   const getSmoothData = useCallback(
     (data: number[] | Float32Array): number[] | Float32Array => {
-      const smoothing = configRef.current.audioSmoothing ?? configRef.current.smoothing ?? 0.5
+      const smoothing = globalSmoothingRef.current
       const length = data.length;
 
       if (!smoothedDataArrayRef.current || smoothedDataArrayRef.current.length !== length) {
@@ -910,11 +922,23 @@ export const WebGLVisualiser = ({
         gl.uniform1f(timeLoc, ((performance.now() - startTimeRef.current) / 1000) * actualSpeed)
       }
       gl.uniform1f(getLoc('u_energy'), avg * sensitivity)
+
+      const fixMode = whiteCircleFixRef.current === 'original' ? 0 : (whiteCircleFixRef.current === 'energy' ? 1 : 2)
+      const fixModeLoc = getLoc('u_fixMode'); if (fixModeLoc) gl.uniform1i(fixModeLoc, fixMode)
+
       const beatLoc = getLoc('u_beat'); if (beatLoc) {
         const currentBeatData = beatDataRef.current
-        if (currentBeatData) beatRef.current += currentBeatData.beatIntensity * 0.2
-        else beatRef.current += avg * sensitivity * 0.1
-        gl.uniform1f(beatLoc, beatRef.current)
+        const beatIntensity = currentBeatData ? currentBeatData.beatIntensity : avg * sensitivity
+
+        if (whiteCircleFixRef.current === 'clamp') {
+          // Pass normalized instantaneous intensity for Alternative Fix
+          gl.uniform1f(beatLoc, Math.min(1.0, beatIntensity))
+        } else {
+          // Pass cumulative beat for Original and Energy modes
+          if (currentBeatData) beatRef.current += currentBeatData.beatIntensity * 0.2
+          else beatRef.current += avg * sensitivity * 0.1
+          gl.uniform1f(beatLoc, beatRef.current)
+        }
       }
       // Rotate: 360 degrees to radians
       const rotateValue = cfg.rotate ?? 0

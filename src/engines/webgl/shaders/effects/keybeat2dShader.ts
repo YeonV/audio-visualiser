@@ -10,6 +10,7 @@ export const keybeat2dShader = `
   uniform float u_high;
   uniform float u_beat;
   uniform float u_energy;
+  uniform int u_fixMode;
   uniform vec2 u_resolution;
   uniform float u_keys;
 
@@ -34,8 +35,12 @@ export const keybeat2dShader = `
 
     // Key activation based on beat and randomness
     float seed = random(vec2(keyIdx, floor(u_time * 8.0)));
-    // Use u_energy for instantaneous pulse
-    float activated = step(0.7 - u_energy * 0.5, seed);
+
+    float pulse = u_energy;
+    if (u_fixMode == 0) pulse = u_beat * 0.1;
+    else if (u_fixMode == 2) pulse = u_beat;
+
+    float activated = step(0.7 - pulse * 0.5, seed);
 
     // Key shape
     float keyShape = smoothstep(0.0, 0.1, keyX) * smoothstep(1.0, 0.9, keyX);
@@ -63,6 +68,7 @@ export const keybeat2dShader = `
       color += keyColor * exp(-d * 1.5) * 0.4;
     }
 
+    if (u_fixMode > 0) color = clamp(color, 0.0, 1.0);
     gl_FragColor = vec4(color, 1.0);
   }
 `

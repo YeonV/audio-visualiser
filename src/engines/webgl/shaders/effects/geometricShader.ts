@@ -7,6 +7,7 @@ export const geometricShader = `
   uniform float u_time;
   uniform float u_energy;
   uniform float u_beat;
+  uniform int u_fixMode;
 
   varying vec2 v_position;
 
@@ -45,7 +46,11 @@ export const geometricShader = `
       }
 
       // Pulsing with beat
-      float pulse = sin(u_beat * 2.0 + i * 1.5) * 0.05 * energy;
+      float beatIntensity = energy;
+      if (u_fixMode == 0) beatIntensity = u_beat * 0.1;
+      else if (u_fixMode == 2) beatIntensity = u_beat;
+
+      float pulse = sin(u_beat * 2.0 + i * 1.5) * 0.05 * beatIntensity;
       shape += pulse;
 
       // Edge glow
@@ -62,8 +67,13 @@ export const geometricShader = `
     color += u_primaryColor * centerGlow;
 
     // Energy boost
-    color *= 0.8 + energy * 0.8;
+    float pulseBoost = energy;
+    if (u_fixMode == 0) pulseBoost = u_beat * 0.1;
+    else if (u_fixMode == 2) pulseBoost = u_beat;
 
+    color *= 0.8 + pulseBoost * 0.8;
+
+    if (u_fixMode > 0) color = clamp(color, 0.0, 1.0);
     gl_FragColor = vec4(color, 1.0);
   }
 `
