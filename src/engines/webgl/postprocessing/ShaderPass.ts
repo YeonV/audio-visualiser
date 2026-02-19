@@ -186,21 +186,26 @@ export class ShaderPass {
         const loc = this.gl.getUniformLocation(this.program, name)
         if (loc) {
           this.uniformLocations.set(name, loc)
-          this.setUniformValue(loc, value)
+          this.setUniformValue(name, loc, value)
         }
         continue
       }
-      this.setUniformValue(location, value)
+      this.setUniformValue(name, location, value)
     }
   }
 
   /**
    * Set a single uniform value based on its type
    */
-  protected setUniformValue(location: WebGLUniformLocation, value: unknown): void {
+  protected setUniformValue(name: string, location: WebGLUniformLocation, value: unknown): void {
     if (!this.gl) return
 
-    if (typeof value === 'number') {
+    const def = this.uniformDefs[name]
+    const type = def ? def.type : ''
+
+    if (type === 'i' || type === 't') {
+      this.gl.uniform1i(location, value as number)
+    } else if (typeof value === 'number') {
       this.gl.uniform1f(location, value)
     } else if (typeof value === 'boolean') {
       this.gl.uniform1i(location, value ? 1 : 0)

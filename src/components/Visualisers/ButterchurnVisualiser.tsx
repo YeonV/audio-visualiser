@@ -480,10 +480,16 @@ const ButterchurnVisualiser = forwardRef<ButterchurnVisualiserRef, ButterchurnVi
         if (currentData.length === 0) return
 
         // Calculate bass and overall intensity from melbank
-        const bassEnd = Math.floor(currentData.length * 0.2)
-        const audioArr = Array.from(currentData)
-        const bassSum = audioArr.slice(0, bassEnd).reduce((a, b) => a + b, 0) / bassEnd
-        const overallSum = audioArr.reduce((a, b) => a + b, 0) / currentData.length
+        const length = currentData.length
+        const bassEnd = Math.floor(length * 0.2)
+
+        let bassSum = 0
+        for (let i = 0; i < bassEnd; i++) bassSum += currentData[i]
+        bassSum /= (bassEnd || 1)
+
+        let overallSum = 0
+        for (let i = 0; i < length; i++) overallSum += currentData[i]
+        overallSum /= (length || 1)
 
         // Modulate oscillator frequency based on bass (20-400 Hz range)
         const baseFreq = 60

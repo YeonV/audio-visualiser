@@ -96,7 +96,12 @@ function generateUISchema(schema: VisualizerSchema): string {
       if (p.type === 'boolean') return 5
       return 6
     }
-    return getOrder(a[1]) - getOrder(b[1])
+    const orderA = getOrder(a[1])
+    const orderB = getOrder(b[1])
+    if (orderA === orderB && orderA === 2) {
+      return (a[1].title || a[0]).localeCompare(b[1].title || b[0])
+    }
+    return orderA - orderB
   })
   
   // Generate properties object

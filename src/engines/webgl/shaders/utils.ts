@@ -28,6 +28,25 @@ export function createShader(
 }
 
 /**
+ * Detach shaders and delete program
+ */
+export function deleteProgramAndShaders(
+  gl: WebGLRenderingContext,
+  program: WebGLProgram | null
+): void {
+  if (!program) return
+
+  const shaders = gl.getAttachedShaders(program)
+  if (shaders) {
+    for (const shader of shaders) {
+      gl.detachShader(program, shader)
+      gl.deleteShader(shader)
+    }
+  }
+  gl.deleteProgram(program)
+}
+
+/**
  * Create and link a WebGL program from vertex and fragment shaders
  */
 export function createProgram(

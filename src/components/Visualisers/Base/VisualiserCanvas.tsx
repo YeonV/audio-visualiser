@@ -145,6 +145,7 @@ export const VisualiserCanvas = ({
                   frequencyBands={frequencyBands}
                   beatData={beatData}
                   showControls={showOverlays}
+                  onContextCreated={visualType === 'fluid' ? handleContextCreated : undefined}
                 />
               )
             }

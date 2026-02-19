@@ -182,7 +182,7 @@ const BladeWaveVisualizer: React.FC<BladeWaveProps> = ({
     ctx.globalAlpha = 1
 
     // Process audio data
-    const dataArray = Array.isArray(audioData) ? audioData : Array.from(audioData)
+    const dataArray = audioData
     const dataLength = dataArray.length || 1
 
     // Resample to pointsPerLine
