@@ -11,6 +11,7 @@ export const radialShader = `
   uniform float u_beat;
   uniform float u_energy;
   uniform int u_fixMode;
+  uniform int u_outerGlowMode;
   uniform vec2 u_resolution;
   uniform sampler2D u_melbank;
   uniform float u_bands;
@@ -53,10 +54,16 @@ export const radialShader = `
 
     vec3 color = barColor * inBar * edge;
 
-    // Outer glow - significantly strengthened
+    // Outer glow
     float glowDist = abs(radius - (0.1 + barLength));
-    color += barColor * exp(-glowDist * 8.0) * 0.8 * edge;
-    color += barColor * exp(-glowDist * 4.0) * 0.4 * edge;
+    if (u_outerGlowMode == 0) {
+      // Original weak glow
+      color += barColor * exp(-glowDist * 20.0) * 0.5 * edge;
+    } else {
+      // Strengthened glow
+      color += barColor * exp(-glowDist * 8.0) * 0.8 * edge;
+      color += barColor * exp(-glowDist * 4.0) * 0.4 * edge;
+    }
 
     // Center glow
     color += u_primaryColor * exp(-radius * 4.0) * u_bass * 0.8;

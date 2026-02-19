@@ -72,6 +72,10 @@ const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({
   const setGlobalSmoothing = useStore(state => state.setGlobalSmoothing)
   const whiteCircleFix = useStore(state => state.whiteCircleFix)
   const setWhiteCircleFix = useStore(state => state.setWhiteCircleFix)
+  const outerGlowMode = useStore(state => state.outerGlowMode)
+  const setOuterGlowMode = useStore(state => state.setOuterGlowMode)
+  const textAutoFit = useStore(state => state.textAutoFit)
+  const setTextAutoFit = useStore(state => state.setTextAutoFit)
 
   const setFluidConfig = (update: any) => {
     updateVisualizerConfig('fluid', typeof update === 'function' ? update(fluidConfig) : update)
@@ -548,7 +552,7 @@ const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({
             />
           </Box>
 
-          <Box sx={{ mb: 2 }}>
+          <Box sx={{ mb: 3 }}>
             <Typography variant="body2" sx={{ mb: 1 }}>White Circle Fix Mode</Typography>
             <Grid container spacing={1}>
               {['original', 'energy', 'clamp'].map((mode) => (
@@ -565,6 +569,36 @@ const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({
                 </Grid>
               ))}
             </Grid>
+          </Box>
+
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="body2" sx={{ mb: 1 }}>Outer Glow Mode</Typography>
+            <Grid container spacing={1}>
+              {['original', 'strengthened'].map((mode) => (
+                <Grid size={{ xs: 6 }} key={mode}>
+                  <Button
+                    fullWidth
+                    variant={outerGlowMode === mode ? 'contained' : 'outlined'}
+                    size="small"
+                    onClick={() => setOuterGlowMode(mode as any)}
+                    sx={{ textTransform: 'capitalize', fontSize: '0.7rem' }}
+                  >
+                    {mode}
+                  </Button>
+                </Grid>
+              ))}
+            </Grid>
+          </Box>
+
+          <Box sx={{ mb: 2 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={textAutoFit}
+                onChange={(e) => setTextAutoFit(e.target.checked)}
+              />
+              <Typography variant="body2">Text Auto-Fit (Enlarge texture to fit text)</Typography>
+            </label>
           </Box>
         </Box>
       </CardContent>

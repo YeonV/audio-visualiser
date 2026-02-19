@@ -11,6 +11,7 @@ export const keybeat2dShader = `
   uniform float u_beat;
   uniform float u_energy;
   uniform int u_fixMode;
+  uniform int u_outerGlowMode;
   uniform vec2 u_resolution;
   uniform float u_keys;
 
@@ -61,11 +62,17 @@ export const keybeat2dShader = `
 
     vec3 color = keyColor * keyShape * brightness;
 
-    // Glow for activated keys - strengthened and expanded
+    // Glow for activated keys
     if (activated > 0.5) {
       float d = length(vec2(keyX - 0.5, uv.y - 0.5));
-      color += keyColor * exp(-d * 2.5) * 1.2;
-      color += keyColor * exp(-d * 1.5) * 0.4;
+      if (u_outerGlowMode == 0) {
+        // Original weak glow
+        color += keyColor * exp(-d * 5.0) * 0.8;
+      } else {
+        // Strengthened and expanded glow
+        color += keyColor * exp(-d * 2.5) * 1.2;
+        color += keyColor * exp(-d * 1.5) * 0.4;
+      }
     }
 
     if (u_fixMode > 0) color = clamp(color, 0.0, 1.0);

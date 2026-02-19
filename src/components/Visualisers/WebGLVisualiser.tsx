@@ -102,6 +102,8 @@ export const WebGLVisualiser = ({
 }: WebGLVisualiserProps) => {
   const globalSmoothing = useStore(state => state.globalSmoothing)
   const whiteCircleFix = useStore(state => state.whiteCircleFix)
+  const outerGlowMode = useStore(state => state.outerGlowMode)
+  const textAutoFit = useStore(state => state.textAutoFit)
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const glRef = useRef<WebGLRenderingContext | null>(null)
@@ -183,6 +185,8 @@ export const WebGLVisualiser = ({
 
   const globalSmoothingRef = useRef(globalSmoothing)
   const whiteCircleFixRef = useRef(whiteCircleFix)
+  const outerGlowModeRef = useRef(outerGlowMode)
+  const textAutoFitRef = useRef(textAutoFit)
 
   useEffect(() => {
     globalSmoothingRef.current = globalSmoothing
@@ -222,18 +226,28 @@ export const WebGLVisualiser = ({
     const texH = Math.max(1000, canvasH * 2);
 
     const processLayer = (idx: number, text: string, font: string, color: string, textureRef: React.MutableRefObject<WebGLTexture | null>, keyRef: React.MutableRefObject<string | null>, stateRef: React.MutableRefObject<{ aspect: number; texW: number; texH: number }>) => {
-      const key = `${text}-${font}-${color}-${texW}x${texH}`;
+      const key = `${text}-${font}-${color}-${textAutoFitRef.current ? 'autofit' : 'fixed'}-${texW}x${texH}`;
       const texUnit = idx === 1 ? gl.TEXTURE2 : gl.TEXTURE3;
 
       const drawTextToTexture = () => {
         if (!textureRef.current) textureRef.current = gl.createTexture();
         if (!offscreenCanvasRef.current) offscreenCanvasRef.current = document.createElement('canvas');
         const outCanvas = offscreenCanvasRef.current;
-        outCanvas.width = texW;
-        outCanvas.height = texH;
+
         const ctx = outCanvas.getContext('2d');
         if (ctx) {
-          ctx.clearRect(0, 0, texW, texH);
+          ctx.font = `${fontSize}px "${font}", Arial`;
+          const metrics = ctx.measureText(text);
+          let targetW = texW;
+          if (textAutoFitRef.current) {
+            targetW = Math.max(2000, metrics.width + 100);
+          }
+
+          outCanvas.width = targetW;
+          outCanvas.height = texH;
+
+          // Reset context properties after resize
+          ctx.clearRect(0, 0, targetW, texH);
           ctx.font = `${fontSize}px "${font}", Arial`;
           ctx.fillStyle = color;
           ctx.textBaseline = 'top';
@@ -247,7 +261,7 @@ export const WebGLVisualiser = ({
           gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
           gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
           gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-          stateRef.current.aspect = texW / texH;
+          stateRef.current.aspect = targetW / texH;
         }
       };
 
@@ -959,6 +973,9 @@ export const WebGLVisualiser = ({
       gl.uniform1f(getLoc('u_bass'), bass * sensitivity)
       gl.uniform1f(getLoc('u_mid'), mid * sensitivity)
       gl.uniform1f(getLoc('u_high'), high * sensitivity)
+
+      const glowMode = outerGlowModeRef.current === 'original' ? 0 : 1
+      const glowLoc = getLoc('u_outerGlowMode'); if (glowLoc) gl.uniform1i(glowLoc, glowMode)
 
       // Game of Life
       gl.uniform1f(getLoc('u_cellSize'), cfg.cell_size ?? cfg.base_game_speed ?? 8.0)
