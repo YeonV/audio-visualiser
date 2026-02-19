@@ -565,14 +565,23 @@ export const VISUALISER_SCHEMAS: Record<string, VisualizerSchema> = {\n`
     output += `    type: 'object',\n`
     output += `    properties: {\n`
     
-    // Sort number fields by displayname || id
+    // Sort fields by group and then by displayname || id
+    const getOrder = (f: SchemaField) => {
+      if (f.type === 'color' || f.gradient) return 1
+      if (f.type === 'number' || f.type === 'integer') return 2
+      if (f.enum) return 3
+      if (f.type === 'string') return 4
+      if (f.type === 'boolean') return 5
+      return 6
+    }
+
     schema.fields.sort((a, b) => {
-      const isNumA = a.type === 'number' || a.type === 'integer'
-      const isNumB = b.type === 'number' || b.type === 'integer'
-      if (isNumA && isNumB) {
+      const orderA = getOrder(a)
+      const orderB = getOrder(b)
+      if (orderA === orderB) {
         return (a.title || a.id).localeCompare(b.title || b.id)
       }
-      return 0
+      return orderA - orderB
     })
 
     for (const field of schema.fields) {

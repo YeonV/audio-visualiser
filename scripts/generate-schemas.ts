@@ -98,7 +98,7 @@ function generateUISchema(schema: VisualizerSchema): string {
     }
     const orderA = getOrder(a[1])
     const orderB = getOrder(b[1])
-    if (orderA === orderB && orderA === 2) {
+    if (orderA === orderB) {
       return (a[1].title || a[0]).localeCompare(b[1].title || b[0])
     }
     return orderA - orderB
