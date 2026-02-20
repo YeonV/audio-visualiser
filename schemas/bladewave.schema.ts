@@ -4,7 +4,7 @@
  * Audio-reactive layered waves inspired by SVG animation.
  */
 
-import { VisualizerSchema, colorProp, integerProp, numberProp } from './base.schema'
+import { VisualizerSchema, colorProp, integerProp, numberProp, booleanProp, stringProp } from './base.schema'
 
 export const bladeWaveSchema: VisualizerSchema = {
   $id: 'bladewave',
@@ -52,6 +52,22 @@ export const bladeWaveSchema: VisualizerSchema = {
       minimum: 0.1,
       maximum: 3.0,
       ui: { order: 7 }
+    }),
+    reactivityMode: stringProp('Reactivity Mode', 'Height', {
+      enum: ['Height', 'Speed', 'Both'],
+      description: 'Which part of the animation responds to audio',
+      ui: { order: 8 }
+    }),
+    smoothing: numberProp('Audio Smoothing', 0.5, {
+      minimum: 0,
+      maximum: 0.99,
+      step: 0.01,
+      description: 'Internal smoothing for audio transitions',
+      ui: { order: 9 }
+    }),
+    frequencyMapping: booleanProp('Frequency Mapping', false, {
+      description: 'Map each wave layer to a different frequency band',
+      ui: { order: 10 }
     })
   },
   required: [
@@ -62,7 +78,10 @@ export const bladeWaveSchema: VisualizerSchema = {
     'waveOpacity',
     'speed',
     'audioSensitivity',
-    'waveHeight'
+    'waveHeight',
+    'reactivityMode',
+    'smoothing',
+    'frequencyMapping'
   ],
   metadata: {
     category: 'Simulation',
