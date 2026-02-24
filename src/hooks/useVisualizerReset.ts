@@ -2,6 +2,7 @@ import { useCallback } from 'react'
 import { useStore } from '../store'
 import { getVisualizerIds, getVisualizerConfig } from '../_generated'
 import { DEFAULT_ASTROFOX_CONFIG } from '../components/Visualisers'
+import { VISUALISER_STORAGE_KEY } from '@/store/useStore'
 
 /**
  * Custom hook for visualizer reset operations.
@@ -26,7 +27,7 @@ export const useVisualizerReset = () => {
   const handleResetAll = useCallback(() => {
     if (window.confirm('Are you sure you want to reset ALL settings and visualisers to default? This cannot be undone.')) {
       // Clear Zustand persisted storage
-      localStorage.removeItem('visualiser-storage')
+      localStorage.removeItem(VISUALISER_STORAGE_KEY)
       window.location.reload()
     }
   }, [])

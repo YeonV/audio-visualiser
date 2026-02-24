@@ -63,6 +63,7 @@ export function parseQueryParams(): {
   autoChange?: boolean
   fxEnabled?: boolean
   showFxPanel?: boolean
+  storageName?: string
   [key: string]: any
 } {
   // Extract query string - works for both standalone mode and HashRouter embedded mode
@@ -78,6 +79,10 @@ export function parseQueryParams(): {
   const result: any = {}
   
   // Parse global UI state parameters
+  const storageNameParam = params.get('storageName')
+  if (storageNameParam) {
+    result.storageName = storageNameParam
+  }
   const autoChangeParam = params.get('autoChange')
   if (autoChangeParam !== null) {
     result.autoChange = autoChangeParam === 'true' || autoChangeParam === '1' || autoChangeParam === 'yes'

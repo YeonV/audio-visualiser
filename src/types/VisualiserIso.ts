@@ -6,5 +6,6 @@ export interface VisualiserIsoProps {
   backendAudioData?: number[]
   ConfigFormComponent?: React.ComponentType<any>
   configData?: any
+  storageName?: string
   onClose?: () => void
 }

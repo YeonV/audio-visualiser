@@ -15,6 +15,9 @@ declare const process: { env: { NODE_ENV: string } }
 // Parse query params synchronously before store creation
 const queryParamOverrides = parseQueryParams()
 
+// Determine storage key from query params, global window, or default
+export const VISUALISER_STORAGE_KEY = queryParamOverrides.storageName || (window as any).VISUALISER_STORAGE_NAME || 'visualiser-storage-v6';
+
 const useStore = create(
   devtools(
     persist(
@@ -33,7 +36,7 @@ const useStore = create(
         })
       ),
       {
-        name: 'visualiser-storage-v6',
+        name: VISUALISER_STORAGE_KEY,
         version: VISUALISER_STORE_VERSION,
         partialize: (state: any) => {
           // Exclude non-serializable or static metadata from persistence
