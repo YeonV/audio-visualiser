@@ -147,9 +147,6 @@ if (typeof document !== 'undefined') {
   }
 }
 
-// --- Layer Type Icons ---
-
-// Moved to LAYER_ICONS.ts to avoid Fast Refresh error
 
 export { AVAILABLE_FONTS }
 
