@@ -535,7 +535,10 @@ export const DEFAULT_ASTROFOX_CONFIG: AstrofoxConfig = {
   width: 1920,
   height: 1080,
   primaryColor: '#6366f1',
-  secondaryColor: '#a855f7'
+  secondaryColor: '#a855f7',
+  image_source: 'https://raw.githubusercontent.com/LedFx/LedFx/refs/heads/main/ledfx_assets/discord.png',
+  background_source: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4',
+  gradient: 'linear-gradient(90deg, #ff0000, #00ff00, #0000ff)',
 }
 
 export const ASTROFOX_PRESETS = [

@@ -203,8 +203,16 @@ const AstrofoxVisualiser = forwardRef<AstrofoxVisualiserRef, AstrofoxVisualiserP
             ...layer,
             color: globalPrimary
           };
-        case 'image':
-          return layer;
+        case 'image': {
+          // Use config.background_source for background image layers, else image_source
+          const isBackground = typeof layer.name === 'string' && layer.name.trim().toLowerCase() === 'background';
+          return {
+            ...layer,
+            imageUrl: isBackground
+              ? config.background_source || layer.imageUrl || ''
+              : config.image_source || layer.imageUrl || ''
+          };
+        }
         case 'geometry3d':
           return {
             ...layer,
@@ -233,6 +241,32 @@ const AstrofoxVisualiser = forwardRef<AstrofoxVisualiserRef, AstrofoxVisualiserP
     const canvasRef = useRef<HTMLCanvasElement>(null)
     const animationFrameRef = useRef<number>(0)
     const imageCache = useRef<Map<string, HTMLImageElement>>(new Map())
+    // Track the last image_source to clear cache on change
+    const lastImageSourceRef = useRef<string | null>(null)
+
+    // Clear image cache if image_source changes (including cachebuster)
+    useEffect(() => {
+      // Find the first image layer (non-background) to get the current image_source
+      const imageLayer = (config.layers || []).find(
+        (layer: any) =>
+          layer.type === 'image' &&
+          (!layer.name || layer.name.trim().toLowerCase() !== 'background')
+      );
+      // Only access imageUrl if the layer is actually an ImageLayer
+      let imageLayerUrl = '';
+      if (imageLayer && 'imageUrl' in imageLayer) {
+        imageLayerUrl = imageLayer.imageUrl;
+      }
+      const currentImageSource = config.image_source || imageLayerUrl || '';
+      if (
+        lastImageSourceRef.current !== null &&
+        lastImageSourceRef.current !== currentImageSource
+      ) {
+        imageCache.current.clear();
+      }
+      lastImageSourceRef.current = currentImageSource;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [config.image_source]);
     const canvasSizeRef = useRef({ width: 1920, height: 1080 })
     // Cache for 3D geometry to prevent creating arrays every frame
     const geometryCache = useRef<Map<string, { vertices: [number, number, number][], edges: [number, number][], faces: [number, number, number][] }>>(new Map())

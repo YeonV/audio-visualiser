@@ -250,6 +250,11 @@ export interface AstrofoxConfig {
   height: number
   primaryColor?: string
   secondaryColor?: string
+  tertiaryColor?: string
+  gradient?: string
+  gradient2?: string
+  image_source?: string
+  background_source?: string
 }
 
 // --- Ref Interface ---
