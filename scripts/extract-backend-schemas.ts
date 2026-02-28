@@ -610,6 +610,17 @@ export const VISUALISER_SCHEMAS: Record<string, VisualizerSchema> = {\n`
         setPropDefault('rotate2', 0)
       }
     }
+    
+
+    // --- Custom frontend default overrides ---
+    if (key === 'plasmawled2d') {
+      const setPropDefault = (id: string, val: any) => {
+        const field = schema.fields.find(f => f.id === id)
+        if (field) field.default = val
+        schema.defaults[id] = val
+      }
+      setPropDefault('speed', 8)
+    }
 
     output += `  "${key}": {\n`
     output += `    $id: '${key}',\n`

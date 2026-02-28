@@ -13,13 +13,13 @@ export const waterfallShader = `
   uniform sampler2D u_melbank;
   uniform float u_bands;
   uniform float u_speed;
+  uniform sampler2D u_gradient; // 1D gradient texture
 
   varying vec2 v_position;
 
-  vec3 hsv2rgb(vec3 c) {
-    vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
-    vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
-    return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+  // Sample a color from the 1D gradient texture
+  vec3 sampleGradient(float t) {
+    return texture2D(u_gradient, vec2(t, 0.5)).rgb;
   }
 
   float random(vec2 st) {
@@ -44,15 +44,13 @@ export const waterfallShader = `
     float historyNoise = random(vec2(bandIdx, floor(scroll * 50.0)));
     float intensity = melVal * (1.0 - scroll) + historyNoise * scroll * 0.3;
 
-    // Color by frequency and intensity
-    float hue = bandIdx / bands * 0.7;
-    float sat = 0.8;
-    float val = intensity;
-
-    vec3 color = hsv2rgb(vec3(hue, sat, val));
+    // Color from gradient by band
+    float gradT = bandIdx / (bands - 1.0);
+    vec3 baseColor = sampleGradient(gradT);
+    vec3 color = baseColor * intensity;
 
     // Add glow for high values
-    color += hsv2rgb(vec3(hue, 0.5, 1.0)) * pow(intensity, 3.0) * 0.5;
+    color += baseColor * pow(intensity, 3.0) * 0.5;
 
     // Beat pulse
     color *= 1.0 + u_beat * 0.2;

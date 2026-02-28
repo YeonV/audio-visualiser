@@ -12,13 +12,13 @@ export const bandsMatrixShader = `
   uniform vec2 u_resolution;
   uniform sampler2D u_melbank;
   uniform float u_bands;
+  uniform sampler2D u_gradient; // 1D gradient texture
 
   varying vec2 v_position;
 
-  vec3 hsv2rgb(vec3 c) {
-    vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
-    vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
-    return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+  // Sample a color from the 1D gradient texture
+  vec3 sampleGradient(float t) {
+    return texture2D(u_gradient, vec2(t, 0.5)).rgb;
   }
 
   void main() {
@@ -41,9 +41,9 @@ export const bandsMatrixShader = `
     float cell = smoothstep(0.0, 0.1, cellUV.x) * smoothstep(1.0, 0.9, cellUV.x);
     cell *= smoothstep(0.0, 0.1, cellUV.y) * smoothstep(1.0, 0.9, cellUV.y);
 
-    // Color by column
-    float hue = gridPos.x / bands * 0.7;
-    vec3 cellColor = hsv2rgb(vec3(hue, 0.8, 0.9));
+    // Color from gradient by column
+    float gradT = gridPos.x / (bands - 1.0);
+    vec3 cellColor = sampleGradient(gradT);
 
     // Brightness by row
     cellColor *= 0.5 + (gridPos.y / rows) * 0.5;

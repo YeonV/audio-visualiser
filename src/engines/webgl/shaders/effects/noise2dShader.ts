@@ -13,6 +13,7 @@ export const noise2dShader = `
   uniform float u_zoom;
   uniform float u_speed;
   uniform float u_audioZoom;
+  uniform sampler2D u_gradient; // 1D gradient texture
 
   varying vec2 v_position;
 
@@ -80,10 +81,9 @@ export const noise2dShader = `
     return 42.0 * dot(m*m, vec4(dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3)));
   }
 
-  vec3 hsv2rgb(vec3 c) {
-    vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
-    vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
-    return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+  // Sample a color from the 1D gradient texture
+  vec3 sampleGradient(float t) {
+    return texture2D(u_gradient, vec2(t, 0.5)).rgb;
   }
 
   void main() {
@@ -115,12 +115,9 @@ export const noise2dShader = `
     n += u_mid * 0.1 * sin(time * 5.0);
     n += u_high * 0.05 * sin(time * 10.0 + uv.x * 5.0);
 
-    // Color mapping
-    float hue = fract(n * 0.5 + time * 0.05);
-    float sat = 0.7 + n * 0.3;
-    float val = 0.3 + n * 0.7;
-
-    vec3 color = hsv2rgb(vec3(hue, sat, val));
+    // Color from gradient based on noise value
+    float gradT = clamp(n, 0.0, 1.0);
+    vec3 color = sampleGradient(gradT);
 
     // Mix with theme colors
     color = mix(color, u_primaryColor, (1.0 - n) * 0.3);

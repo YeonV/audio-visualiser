@@ -10,13 +10,13 @@ export const soapShader = `
   uniform float u_high;
   uniform float u_beat;
   uniform vec2 u_resolution;
+  uniform sampler2D u_gradient; // 1D gradient texture
 
   varying vec2 v_position;
 
-  vec3 hsv2rgb(vec3 c) {
-    vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
-    vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
-    return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+  // Sample a color from the 1D gradient texture
+  vec3 sampleGradient(float t) {
+    return texture2D(u_gradient, vec2(t, 0.5)).rgb;
   }
 
   float noise(vec2 p) {
@@ -41,12 +41,9 @@ export const soapShader = `
 
     thickness = clamp(thickness * 0.1 + 0.5, 0.0, 1.0);
 
-    // Iridescent color (thin film interference)
-    float hue = fract(thickness * 2.0 + time * 0.1);
-    float sat = 0.6 + thickness * 0.3;
-    float val = 0.7 + thickness * 0.3;
-
-    vec3 color = hsv2rgb(vec3(hue, sat, val));
+    // Color from gradient based on thickness
+    float gradT = clamp(thickness, 0.0, 1.0);
+    vec3 color = sampleGradient(gradT);
 
     // Add specular highlights
     vec2 lightPos = vec2(0.3, 0.3);

@@ -13,13 +13,13 @@ export const bandsShader = `
   uniform sampler2D u_melbank;
   uniform float u_bands;
   uniform float u_flip;
+  uniform sampler2D u_gradient; // 1D gradient texture
 
   varying vec2 v_position;
 
-  vec3 hsv2rgb(vec3 c) {
-    vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
-    vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
-    return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+  // Sample a color from the 1D gradient texture
+  vec3 sampleGradient(float t) {
+    return texture2D(u_gradient, vec2(t, 0.5)).rgb;
   }
 
   void main() {
@@ -40,9 +40,9 @@ export const bandsShader = `
     // Gap between bars
     float gap = smoothstep(0.0, 0.1, barX) * smoothstep(1.0, 0.9, barX);
 
-    // Color gradient
-    float hue = barIdx / bands * 0.7;
-    vec3 barColor = hsv2rgb(vec3(hue, 0.8, 1.0));
+    // Color from gradient
+    float gradT = barIdx / (bands - 1.0);
+    vec3 barColor = sampleGradient(gradT);
 
     vec3 color = barColor * inBar * gap;
 

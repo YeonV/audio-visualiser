@@ -10,13 +10,13 @@ export const plasma2dShader = `
   uniform vec2 u_resolution;
   uniform float u_density;
   uniform float u_twist;
+  uniform sampler2D u_gradient; // 1D gradient texture
 
   varying vec2 v_position;
 
-  vec3 hsv2rgb(vec3 c) {
-    vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
-    vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
-    return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+  // Sample a color from the 1D gradient texture
+  vec3 sampleGradient(float t) {
+    return texture2D(u_gradient, vec2(t, 0.5)).rgb;
   }
 
   void main() {
@@ -53,9 +53,9 @@ export const plasma2dShader = `
     // Beat modulation
     v += sin(u_beat * 3.14159) * 0.1;
 
-    // Color mapping
-    float hue = fract(v + time * 0.1);
-    vec3 color = hsv2rgb(vec3(hue, 0.8, 0.9));
+    // Color from gradient based on v
+    float gradT = clamp(v, 0.0, 1.0);
+    vec3 color = sampleGradient(gradT);
 
     // Mix with theme colors
     color = mix(color, u_primaryColor, sin(v * 3.14159) * 0.3 + 0.3);

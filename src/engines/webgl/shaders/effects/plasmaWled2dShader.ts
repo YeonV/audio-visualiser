@@ -10,13 +10,13 @@ export const plasmaWled2dShader = `
   uniform float u_high;
   uniform float u_beat;
   uniform vec2 u_resolution;
+  uniform sampler2D u_gradient; // 1D gradient texture
 
   varying vec2 v_position;
 
-  vec3 hsv2rgb(vec3 c) {
-    vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
-    vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
-    return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+  // Sample a color from the 1D gradient texture
+  vec3 sampleGradient(float t) {
+    return texture2D(u_gradient, vec2(t, 0.5)).rgb;
   }
 
   void main() {
@@ -38,9 +38,9 @@ export const plasmaWled2dShader = `
     v += u_bass * sin(time * 3.0) * 0.2;
     v += u_mid * sin(time * 5.0 + uv.x * 3.0) * 0.1;
 
-    // Color palette (WLED style - bright and saturated)
-    float hue = fract(v + time * 0.1);
-    vec3 color = hsv2rgb(vec3(hue, 1.0, 1.0));
+    // Color from gradient based on v
+    float gradT = clamp(v * 0.5 + 0.5, 0.0, 1.0);
+    vec3 color = sampleGradient(gradT);
 
     // Beat pulse
     color *= 0.8 + u_beat * 0.4;
