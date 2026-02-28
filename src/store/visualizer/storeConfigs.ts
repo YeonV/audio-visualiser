@@ -130,13 +130,15 @@ const storeConfigs = (set: any, get: any) => {
       visualizerConfigs: { ...state.visualizerConfigs, [id]: config }
     })),
 
-  updateVisualizerConfig: (id: string, partial: any) =>
-    set((state: any) => ({
+  updateVisualizerConfig: (id: string, partial: any) => 
+     set((state: any) => {
+      console.log('sooooo', state.visualizerConfigs[id], partial)
+      return ({
       visualizerConfigs: {
         ...state.visualizerConfigs,
         [id]: { ...state.visualizerConfigs[id], ...partial }
       }
-    })),
+    })}),
 
   setAstrofoxReady: (ready: boolean) => set({ astrofoxReady: ready }),
 

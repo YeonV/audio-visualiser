@@ -297,23 +297,62 @@ const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({
               ))}
             </Box>
 
-            {/* Background Color */}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-              <Typography variant="body2">Background:</Typography>
-              <input
-                type="color"
-                value={astrofoxConfig.backgroundColor}
-                onChange={(e) =>
-                  setAstrofoxConfig((prev: any) => ({
-                    ...prev,
-                    backgroundColor: e.target.value
-                  }))
-                }
-                style={{ width: 40, height: 30, cursor: 'pointer', border: 'none' }}
-              />
-              <Typography variant="caption" sx={{ fontFamily: 'monospace' }}>
-                {astrofoxConfig.backgroundColor}
-              </Typography>
+            {/* Background & Main Colors */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 4, mb: 2 }}>
+              {/* Background Color */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography variant="body2">Background:</Typography>
+                <input
+                  type="color"
+                  value={astrofoxConfig.backgroundColor}
+                  onChange={(e) =>
+                    setAstrofoxConfig((prev: any) => ({
+                      ...prev,
+                      backgroundColor: e.target.value
+                    }))
+                  }
+                  style={{ width: 40, height: 30, cursor: 'pointer', border: 'none' }}
+                />
+                <Typography variant="caption" sx={{ fontFamily: 'monospace' }}>
+                  {astrofoxConfig.backgroundColor}
+                </Typography>
+              </Box>
+              {/* Primary Color */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography variant="body2">Primary:</Typography>
+                <input
+                  type="color"
+                  value={astrofoxConfig.primaryColor || '#ffffff'}
+                  onChange={(e) =>
+                    setAstrofoxConfig((prev: any) => ({
+                      ...prev,
+                      primaryColor: e.target.value
+                    }))
+                  }
+                  style={{ width: 40, height: 30, cursor: 'pointer', border: 'none' }}
+                />
+                <Typography variant="caption" sx={{ fontFamily: 'monospace' }}>
+                  {astrofoxConfig.primaryColor}
+                </Typography>
+              </Box>
+              {/* Secondary Color */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography variant="body2">Secondary:</Typography>
+                <input
+                  type="color"
+                  value={astrofoxConfig.secondaryColor || '#ffffff'}
+                  onChange={(e) =>
+                    setAstrofoxConfig((prev: any) => ({
+                      ...prev,
+                      secondaryColor: e.target.value
+                    }))
+                  }
+                  style={{ width: 40, height: 30, cursor: 'pointer', border: 'none' }}
+                />
+                <Typography variant="caption" sx={{ fontFamily: 'monospace' }}>
+                  {astrofoxConfig.secondaryColor}
+                </Typography>
+              </Box>
             </Box>
 
             <Divider sx={{ my: 2 }} />

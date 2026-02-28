@@ -248,6 +248,8 @@ export interface AstrofoxConfig {
   backgroundColor: string
   width: number
   height: number
+  primaryColor?: string
+  secondaryColor?: string
 }
 
 // --- Ref Interface ---

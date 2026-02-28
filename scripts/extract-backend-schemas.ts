@@ -277,7 +277,7 @@ function parsePythonEffect(content: string, effectName: string): EffectSchema {
     )
   }
 
-  if (content.includes('Twod')) {
+  if (content.includes('Twod') && effectName !== 'radial') {
     inheritedFields.push(
       { id: 'flip_horizontal', title: 'Flip Horizontal', type: 'boolean', default: false, description: 'Flip image horizontally' },
       { id: 'flip_vertical', title: 'Flip Vertical', type: 'boolean', default: false, description: 'Flip image vertically' },
@@ -291,6 +291,33 @@ function parsePythonEffect(content: string, effectName: string): EffectSchema {
     { id: 'brightness', title: 'Brightness', type: 'number', default: 1.0, min: 0, max: 1.0, step: 0.01 },
     { id: 'blur', title: 'Blur', type: 'number', default: 0.0, min: 0, max: 10, step: 0.1 }
   )
+
+  // Radial-specific UI fields
+  if (effectName === 'radial') {
+    // Remove unwanted fields by not adding them
+    // Add pulse_color and edges with new max, only if not already present
+    if (!fields.find(f => f.id === 'pulse_color')) {
+      fields.push({
+        id: 'pulse_color',
+        title: 'Pulse Color',
+        type: 'color',
+        default: '#FFFFFF',
+        description: 'Color for center pulse glow'
+      });
+    }
+    if (!fields.find(f => f.id === 'edges')) {
+      fields.push({
+        id: 'edges',
+        title: 'Edges',
+        type: 'number',
+        default: 8,
+        min: 0,
+        max: 128,
+        step: 1,
+        description: 'Number of radial edges (bars)'
+      });
+    }
+  }
 
   for (const f of inheritedFields) {
     if (!fields.find(existing => existing.id === f.id)) {
@@ -423,6 +450,27 @@ export const VISUALISER_SCHEMAS: Record<string, VisualizerSchema> = {\n`
   for (const [key, schema] of Object.entries(schemas)) {
     let displayName = key.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
     if (key === 'bladeTexter') displayName = 'Blade Texter'
+
+    // UI Tweaks for equalizer2d
+    if (key === 'equalizer2d') {
+      // Remove unwanted fields
+      schema.fields = schema.fields.filter(f => f.id !== 'background_mode' && f.id !== 'frequency_range' && f.id !== 'max_vs_mean')
+      schema.hiddenKeys.push('background_mode', 'frequency_range', 'max_vs_mean')
+
+      // Add new controls if not present
+      const addField = (field: SchemaField) => {
+        if (!schema.fields.some(f => f.id === field.id)) schema.fields.push(field)
+      }
+      addField({ id: 'pulse_color', title: 'Pulse Color', type: 'color', default: '#FFFFFF' })
+      addField({ id: 'peak_marks', title: 'Peak Marks', type: 'boolean', default: false })
+      addField({ id: 'flip_horizontal', title: 'Flip Horizontal', type: 'boolean', default: false })
+      addField({ id: 'flip_vertical', title: 'Flip Vertical', type: 'boolean', default: false })
+      addField({ id: 'peak_percent', title: 'Peak Percent', type: 'integer', default: 10, min: 1, max: 100, step: 1 })
+      addField({ id: 'peak_decay', title: 'Peak Decay', type: 'number', default: 0.03, min: 0.01, max: 0.1, step: 0.01 })
+      addField({ id: 'brightness', title: 'Brightness', type: 'number', default: 1, min: 0, max: 1, step: 0.01 })
+      addField({ id: 'rotate', title: 'Rotate', type: 'integer', default: 0, min: 0, max: 360, step: 1 })
+      addField({ id: 'peak_color', title: 'Peak Color', type: 'color', default: '#FFFFFF' })
+    }
 
     // UI Tweaks for specific effects
     if (key === 'texter' || key === 'bladeTexter') {

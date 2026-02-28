@@ -1,3 +1,6 @@
+// Re-export config and preset helpers for external usage
+// eslint-disable-next-line react-refresh/only-export-components
+export { DEFAULT_ASTROFOX_CONFIG, ASTROFOX_PRESETS, getAstrofoxPresetLayers } from '../../engines/astrofox/presets/defaults'
 /**
  * AstrofoxVisualiser - Layer-based audio visualizations inspired by Astrofox
  *
@@ -109,7 +112,7 @@ import {
   DEFAULT_ASTROFOX_CONFIG
 } from '../../engines/astrofox/presets/defaults'
 
-export { ASTROFOX_PRESETS, getAstrofoxPresetLayers, DEFAULT_ASTROFOX_CONFIG }
+// Export moved to separate file to avoid Fast Refresh error
 export type AstrofoxPresetName = (typeof ASTROFOX_PRESETS)[number]
 
 // --- Font List (from Astrofox fonts.json) ---
@@ -146,22 +149,8 @@ if (typeof document !== 'undefined') {
 
 // --- Layer Type Icons ---
 
-// eslint-disable-next-line react-refresh/only-export-components
-export const LAYER_ICONS: Record<AstrofoxLayerType, React.ReactNode> = {
-  barSpectrum: <BarChart />,
-  waveSpectrum: <GraphicEq />,
-  soundWave: <Timeline />,
-  soundWave2: <GraphicEq />,
-  text: <TextFields />,
-  image: <ImageIcon />,
-  geometry3d: <ViewInAr />,
-  group: <Folder />,
-  neonTunnel: <ViewInAr />,
-  reactiveOrb: <ViewInAr />,
-  particleField: <ViewInAr />
-}
+// Moved to LAYER_ICONS.ts to avoid Fast Refresh error
 
-// eslint-disable-next-line react-refresh/only-export-components
 export { AVAILABLE_FONTS }
 
 /** Audio data array type - supports both number[] and Float32Array */
@@ -181,6 +170,66 @@ const AstrofoxVisualiser = forwardRef<AstrofoxVisualiserRef, AstrofoxVisualiserP
     },
     ref
   ) => {
+    // Inject global primary/secondary color into all relevant layers
+    const globalPrimary = config.primaryColor || '#6366f1';
+    const globalSecondary = config.secondaryColor || '#a855f7';
+    const layersWithGlobalColors = config.layers.map((layer) => {
+      switch (layer.type) {
+        case 'barSpectrum':
+          return {
+            ...layer,
+            barColor: globalPrimary,
+            barColorEnd: globalSecondary
+          };
+        case 'waveSpectrum':
+          return {
+            ...layer,
+            lineColor: globalPrimary,
+            fillColor: globalSecondary
+          };
+        case 'soundWave':
+          return {
+            ...layer,
+            color: globalPrimary,
+            fillColor: globalSecondary
+          };
+        case 'soundWave2':
+          return {
+            ...layer,
+            lineColor: globalPrimary
+          };
+        case 'text':
+          return {
+            ...layer,
+            color: globalPrimary
+          };
+        case 'image':
+          return layer;
+        case 'geometry3d':
+          return {
+            ...layer,
+            color: globalPrimary
+          };
+        case 'neonTunnel':
+          return {
+            ...layer,
+            color: globalPrimary
+          };
+        case 'reactiveOrb':
+          return {
+            ...layer,
+            color: globalPrimary
+          };
+        case 'particleField':
+          return {
+            ...layer,
+            particleColor: globalPrimary
+          };
+        default:
+          return layer;
+      }
+    });
+    // Use layersWithGlobalColors instead of config.layers below
     const canvasRef = useRef<HTMLCanvasElement>(null)
     const animationFrameRef = useRef<number>(0)
     const imageCache = useRef<Map<string, HTMLImageElement>>(new Map())
@@ -585,7 +634,7 @@ const AstrofoxVisualiser = forwardRef<AstrofoxVisualiserRef, AstrofoxVisualiserP
       ctx.fillRect(0, 0, width, height)
 
       // Render layers from bottom to top
-      for (const layer of config.layers) {
+      for (const layer of layersWithGlobalColors) {
         if (!layer.visible) continue
 
         switch (layer.type) {
@@ -625,7 +674,7 @@ const AstrofoxVisualiser = forwardRef<AstrofoxVisualiserRef, AstrofoxVisualiserP
         }
       }
     }, [
-      config.layers,
+      layersWithGlobalColors,
       config.backgroundColor,
       audioData,
       parseAudioData,
@@ -699,11 +748,12 @@ const AstrofoxVisualiser = forwardRef<AstrofoxVisualiserRef, AstrofoxVisualiserP
 
     // Cleanup Three.js renderers on unmount
     useEffect(() => {
+      const cache = three3DRendererCache.current;
       return () => {
-        three3DRendererCache.current.forEach((renderer) => {
-          renderer.dispose()
-        })
-        three3DRendererCache.current.clear()
+        cache.forEach((renderer) => {
+          renderer.dispose();
+        });
+        cache.clear();
       }
     }, [])
 
@@ -762,7 +812,7 @@ const AstrofoxVisualiser = forwardRef<AstrofoxVisualiserRef, AstrofoxVisualiserP
       ref,
       () => ({
         getCanvas: () => canvasRef.current,
-        layers: config.layers,
+        layers: layersWithGlobalColors,
         selectedLayerId,
         setSelectedLayerId,
         addLayer,
@@ -775,7 +825,7 @@ const AstrofoxVisualiser = forwardRef<AstrofoxVisualiserRef, AstrofoxVisualiserP
         reorderLayer
       }),
       [
-        config.layers,
+        layersWithGlobalColors,
         selectedLayerId,
         setSelectedLayerId,
         addLayer,

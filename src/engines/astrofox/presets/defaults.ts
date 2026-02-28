@@ -533,7 +533,9 @@ export const DEFAULT_ASTROFOX_CONFIG: AstrofoxConfig = {
   layers: PRESET_LAYERS.default,
   backgroundColor: '#0f0f23',
   width: 1920,
-  height: 1080
+  height: 1080,
+  primaryColor: '#6366f1',
+  secondaryColor: '#a855f7'
 }
 
 export const ASTROFOX_PRESETS = [

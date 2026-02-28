@@ -3,18 +3,16 @@ export const radialShader = `
   precision highp float;
 
   uniform vec3 u_primaryColor;
-  uniform vec3 u_secondaryColor;
-  uniform float u_time;
+  uniform vec3 u_pulseColor;
   uniform float u_bass;
-  uniform float u_mid;
-  uniform float u_high;
   uniform float u_beat;
-  uniform float u_energy;
-  uniform int u_fixMode;
-  uniform int u_outerGlowMode;
+  uniform float u_rotate;
+  uniform float u_edges;
   uniform vec2 u_resolution;
   uniform sampler2D u_melbank;
   uniform float u_bands;
+  uniform sampler2D u_gradient;
+  uniform float u_gradientRoll;
 
   varying vec2 v_position;
 
@@ -30,10 +28,16 @@ export const radialShader = `
     vec2 uv = v_position;
     uv.x *= u_resolution.x / u_resolution.y;
 
+    // Apply rotation
+    float c = cos(u_rotate);
+    float s = sin(u_rotate);
+    uv = mat2(c, -s, s, c) * uv;
+
     float angle = atan(uv.y, uv.x) + PI;
     float radius = length(uv);
 
     float bands = u_bands;
+    float edges = max(1.0, u_edges);
     float bandAngle = 2.0 * PI / bands;
     float bandIdx = floor(angle / bandAngle);
     float bandFrac = fract(angle / bandAngle);
@@ -48,36 +52,22 @@ export const radialShader = `
     // Edge fade
     float edge = smoothstep(0.0, 0.2, bandFrac) * smoothstep(1.0, 0.8, bandFrac);
 
-    // Color by angle
-    float hue = bandIdx / bands;
-    vec3 barColor = hsv2rgb(vec3(hue, 0.9, 1.0));
+    // Color by gradient texture
+    float gradPos = mod(bandIdx / bands + u_gradientRoll, 1.0);
+    vec3 barColor = texture2D(u_gradient, vec2(gradPos, 0.5)).rgb;
 
     vec3 color = barColor * inBar * edge;
 
-    // Outer glow
+    // Outer glow (always use strong mode)
     float glowDist = abs(radius - (0.1 + barLength));
-    if (u_outerGlowMode == 0) {
-      // Original weak glow
-      color += barColor * exp(-glowDist * 20.0) * 0.5 * edge;
-    } else {
-      // Strengthened glow
-      color += barColor * exp(-glowDist * 8.0) * 0.8 * edge;
-      color += barColor * exp(-glowDist * 4.0) * 0.4 * edge;
-    }
+    color += barColor * exp(-glowDist * 8.0) * 0.8 * edge;
+    color += barColor * exp(-glowDist * 4.0) * 0.4 * edge;
 
-    // Center glow
-    color += u_primaryColor * exp(-radius * 4.0) * u_bass * 0.8;
+    // Center glow (pulse color)
+    color += u_pulseColor * exp(-radius * 4.0) * u_bass * 0.8;
 
     // Beat pulse
-    if (u_fixMode == 0) {
-      color *= 1.0 + u_beat * 0.3;
-    } else if (u_fixMode == 1) {
-      color *= 1.0 + u_energy * 0.8;
-    } else {
-      color *= 1.0 + u_beat * 0.8;
-    }
-
-    if (u_fixMode > 0) color = clamp(color, 0.0, 1.0);
+    color *= 1.0 + u_beat * 0.3;
     gl_FragColor = vec4(color, 1.0);
   }
 `

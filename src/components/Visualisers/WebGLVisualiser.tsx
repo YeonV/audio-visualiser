@@ -45,19 +45,27 @@ import { handleTextTexture as handleTextTextureHelper, handleGradients as handle
 
 export type { WebGLVisualisationType } from './WebGLVisualiserTypes'
 
-export const WebGLVisualiser = ({
-  audioData,
-  isPlaying,
-  visualType,
-  config,
-  customShader,
-  beatData,
-  frequencyBands,
-  theme,
-  postProcessing,
-  postProcessingEnabled = false,
-  onContextCreated
-}: WebGLVisualiserProps) => {
+export const WebGLVisualiser = (props: WebGLVisualiserProps) => {
+
+
+  const {
+    audioData,
+    isPlaying,
+    visualType,
+    config,
+    customShader,
+    beatData,
+    frequencyBands,
+    theme,
+    postProcessing,
+    postProcessingEnabled = false,
+    onContextCreated
+  } = props
+
+  // Peaks texture for detached peak marks (must be inside component for hooks)
+  const peaksTextureRef = useRef<WebGLTexture | null>(null)
+  const peaksArrayRef = useRef<Uint8Array | null>(null)
+  // ...existing code...
   const globalSmoothing = useStore(state => state.globalSmoothing)
   const whiteCircleFix = useStore(state => state.whiteCircleFix)
   const outerGlowMode = useStore(state => state.outerGlowMode)
@@ -79,6 +87,9 @@ export const WebGLVisualiser = ({
   const animationRef = useRef<number | undefined>(undefined)
   const startTimeRef = useRef<number>(performance.now())
   const previousDataRef = useRef<number[] | Float32Array>([])
+  // Python-style per-band peak filter for peak marks
+  const peakValsRef = useRef<number[]>([])
+  const lastPeakUpdateRef = useRef<number>(performance.now())
   const particlesRef = useRef<Particle[]>([])
   const historyRef = useRef<number[]>(new Array(128).fill(0))
   const beatRef = useRef<number>(0)
@@ -452,19 +463,28 @@ export const WebGLVisualiser = ({
       gl.uniform2f(getLoc('u_resolution'), width, height)
       gl.uniform1f(getLoc('u_time'), (performance.now() - startTimeRef.current) / 1000)
 
+
       const primaryColor = cfg.primaryColor ? hexToRgb(cfg.primaryColor) : themeColorsRef.current.primary
       const secondaryColor = cfg.secondaryColor ? hexToRgb(cfg.secondaryColor) : themeColorsRef.current.secondary
       gl.uniform3f(getLoc('u_primaryColor'), primaryColor[0], primaryColor[1], primaryColor[2])
       gl.uniform3f(getLoc('u_secondaryColor'), secondaryColor[0], secondaryColor[1], secondaryColor[2])
 
-      handleGradients(gl, cfg)
+      // Gradient support for radial, bands, eq2d
+      if (
+        (visualType === 'radial' || visualType === 'bands' || visualType === 'waterfall' || visualType === 'soap' || visualType === 'plasmawled2d' || visualType === 'plasma2d' || visualType === 'noise2d' || visualType === 'blocks' || visualType === 'bandsmatrix' || visualType === 'equalizer2d') &&
+        getLoc('u_gradient') && getLoc('u_gradientRoll')
+      ) {
+        handleGradients(gl, cfg)
+        gl.uniform1f(getLoc('u_gradientRoll'), cfg.gradient_roll ?? 0)
+        gl.uniform1i(getLoc('u_gradient'), 2) // Bind gradient to texture unit 2
+      }
 
       gl.drawArrays(gl.TRIANGLES, 0, bufferLength * 12)
       gl.disableVertexAttribArray(positionLoc)
       if (amplitudeLoc !== -1) gl.disableVertexAttribArray(amplitudeLoc)
       if (indexLoc !== -1) gl.disableVertexAttribArray(indexLoc)
     },
-    [getLoc, getAttribLoc, handleGradients, getBuffer, getTypedArray]
+    [getLoc, getAttribLoc, handleGradients, getBuffer, getTypedArray, visualType]
   )
 
   // Draw particles
@@ -773,12 +793,44 @@ export const WebGLVisualiser = ({
   // Draw Custom / GIF / Matrix Effects
   const drawCustom = useCallback(
     (gl: WebGLRenderingContext, data: number[] | Float32Array, width: number, height: number) => {
-      const program = programRef.current
-      if (!program) return
+      
       const cfg = configRef.current
+      const sensitivity = cfg.audioSensitivity ?? cfg.sensitivity ?? cfg.multiplier ?? 1.0
+
+      // --- Python-style per-band peak filter for peak marks ---
+      const now = performance.now()
+      const dt = Math.max(1, now - lastPeakUpdateRef.current)
+      lastPeakUpdateRef.current = now
+      const bands = data.length
+      // Use a filter for each band: alpha_decay for fall, alpha_rise for rise
+      const alpha_decay = cfg.peak_decay ?? 0.01
+      const alpha_rise = 0.99
+      if (peakValsRef.current.length !== bands) {
+        peakValsRef.current = Array(bands).fill(0)
+      }
+      for (let i = 0; i < bands; ++i) {
+        const v = data[i] * sensitivity;
+        if (v > peakValsRef.current[i]) {
+          // Instant rise to new peak
+          peakValsRef.current[i] = v;
+        } else {
+          // Slow decay
+          peakValsRef.current[i] = peakValsRef.current[i] * (1 - alpha_decay);
+        }
+      }
+      // Pass peaks to shader as uniform array
+      const program = programRef.current
+      if (program) {
+        const peakLoc = gl.getUniformLocation(program, 'u_peaks')
+        if (peakLoc) {
+          gl.uniform1fv(peakLoc, peakValsRef.current)
+        }
+      }
+      // --- End Python-style per-band peak filter ---
+      if (!program) return
       const currentVisualType = visualTypeRef.current
 
-      const sensitivity = cfg.audioSensitivity ?? cfg.sensitivity ?? cfg.multiplier ?? 1.0
+      // const sensitivity = cfg.audioSensitivity ?? cfg.sensitivity ?? cfg.multiplier ?? 1.0
       const avg = (data as any).reduce((a: number, b: number) => a + b, 0) / data.length
 
       const rotation = cfg.rotate ? cfg.rotate * (Math.PI / 180) : 0
@@ -859,13 +911,55 @@ export const WebGLVisualiser = ({
       // Plasma
       gl.uniform1f(getLoc('u_twist'), cfg.twist ?? 0.1)
 
-      // Equalizer
+
+      // (No-op: removed obsolete code placeholder)
       gl.uniform1f(getLoc('u_bands'), cfg.bands ?? 16.0)
       gl.uniform1f(getLoc('u_ringMode'), (cfg.ring || cfg.ring_mode) ? 1.0 : 0.0)
       gl.uniform1f(getLoc('u_centerMode'), (cfg.center || cfg.center_mode) ? 1.0 : 0.0)
       const sLoc = getLoc('u_spin'); if (sLoc) {
         if (cfg.spin || cfg.spin_enabled) beatRef.current += bass * (cfg.spin_multiplier ?? 1.0) * 0.05
         gl.uniform1f(sLoc, beatRef.current)
+      }
+
+      // New equalizer2d uniforms
+      // Pulse color
+      if (getLoc('u_pulseColor')) {
+        const pulseColor = cfg.pulse_color ? hexToRgb(cfg.pulse_color) : [1, 1, 1]
+        gl.uniform3f(getLoc('u_pulseColor'), pulseColor[0], pulseColor[1], pulseColor[2])
+      }
+      // Peak marks (bool)
+      if (getLoc('u_peakMarks')) {
+        gl.uniform1i(getLoc('u_peakMarks'), cfg.peak_marks ? 1 : 0)
+      }
+      // Peak color
+      if (getLoc('u_peakColor')) {
+        const peakColor = cfg.peak_color ? hexToRgb(cfg.peak_color) : [1, 1, 1]
+        gl.uniform3f(getLoc('u_peakColor'), peakColor[0], peakColor[1], peakColor[2])
+      }
+      // Flip horizontal/vertical (bool)
+      if (getLoc('u_flipHorizontal')) {
+        gl.uniform1i(getLoc('u_flipHorizontal'), cfg.flip_horizontal ? 1 : 0)
+      }
+      if (getLoc('u_flipVertical')) {
+        gl.uniform1i(getLoc('u_flipVertical'), cfg.flip_vertical ? 1 : 0)
+      }
+      // Peak percent/decay
+      if (getLoc('u_peakPercent')) {
+        // Divide by 100 to match new slider range
+        gl.uniform1f(getLoc('u_peakPercent'), (cfg.peak_percent ?? 1.0) / 100)
+      }
+      if (getLoc('u_peakDecay')) {
+        gl.uniform1f(getLoc('u_peakDecay'), cfg.peak_decay ?? 0.03)
+      }
+      // Brightness
+      if (getLoc('u_brightness')) {
+        gl.uniform1f(getLoc('u_brightness'), cfg.brightness ?? 1.0)
+      }
+      // Rotate (already set above, but ensure it's set for custom shaders)
+      if (getLoc('u_rotate')) {
+        const rotateValue = cfg.rotate ?? 0
+        const radians = rotateValue * Math.PI / 180
+        gl.uniform1f(getLoc('u_rotate'), radians)
       }
 
       // Gradient support
@@ -884,6 +978,29 @@ export const WebGLVisualiser = ({
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.LUMINANCE, data.length, 1, 0, gl.LUMINANCE, gl.UNSIGNED_BYTE, texData)
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
         gl.uniform1i(melBankLoc, 0)
+      }
+
+      const peakLoc = getLoc('u_peaks')
+      if (peakLoc && data.length > 0 && cfg.peak_marks) {
+        if (!peaksTextureRef.current) peaksTextureRef.current = gl.createTexture()
+        // Use TEXTURE4 to safely avoid colliding with melbank, history, gradients, or text
+        gl.activeTexture(gl.TEXTURE4); 
+        gl.bindTexture(gl.TEXTURE_2D, peaksTextureRef.current)
+        
+        if (!peaksArrayRef.current || peaksArrayRef.current.length !== data.length) {
+          peaksArrayRef.current = new Uint8Array(data.length);
+        }
+        const pData = peaksArrayRef.current;
+        for (let i = 0; i < data.length; i++) {
+          // Map peak value directly (0 = bottom, 1 = top)
+          pData[i] = Math.min(255, Math.max(0, peakValsRef.current[i] * 255))
+        }
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.LUMINANCE, data.length, 1, 0, gl.LUMINANCE, gl.UNSIGNED_BYTE, pData)
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+        gl.uniform1i(peakLoc, 4) // Bind uniform to unit 4
       }
 
       // Remaining uniforms
@@ -1055,7 +1172,8 @@ export const WebGLVisualiser = ({
         if (histTex) gl.deleteTexture(histTex)
         if (textTex) gl.deleteTexture(textTex)
         if (textTex2Ref.current) gl.deleteTexture(textTex2Ref.current)
-        
+        if (peaksTextureRef.current) gl.deleteTexture(peaksTextureRef.current)
+
         buffers.forEach(buffer => gl.deleteBuffer(buffer))
         buffers.clear()
         
