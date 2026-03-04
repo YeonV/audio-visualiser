@@ -10,6 +10,7 @@
  */
 
 import { ShaderPass, fullscreenVertexShader } from '../ShaderPass'
+import { hasGL, warnNoGL } from '../../glUtils'
 
 // First pass: Extract bright areas (similar to bloom)
 const extractBrightFragmentShader = `
@@ -183,6 +184,11 @@ export class GodRaysPass extends ShaderPass {
   init(gl: WebGLRenderingContext): boolean {
     if (this.isInitialized && this.gl === gl) return true
 
+    if (!hasGL(gl)) {
+      warnNoGL('GodRaysPass.init')
+      return false
+    }
+
     this.gl = gl
 
     if (!this.extractPass.init(gl)) return false
@@ -197,7 +203,10 @@ export class GodRaysPass extends ShaderPass {
     width: number,
     height: number
   ): { framebuffer: WebGLFramebuffer; texture: WebGLTexture } | null {
-    if (!this.gl) return null
+    if (!hasGL(this.gl)) {
+      warnNoGL('GodRaysPass.createBuffer')
+      return null
+    }
     const gl = this.gl
 
     const framebuffer = gl.createFramebuffer()
@@ -238,7 +247,7 @@ export class GodRaysPass extends ShaderPass {
   }
 
   private disposeBuffers(): void {
-    if (!this.gl) return
+    if (!hasGL(this.gl)) return
 
     const buffers = [this.extractBuffer, this.blurBuffer]
     for (const buf of buffers) {

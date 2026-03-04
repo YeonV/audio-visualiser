@@ -8,6 +8,7 @@
  */
 
 import { ShaderPass, fullscreenVertexShader } from '../ShaderPass'
+import { hasGL, warnNoGL } from '../../glUtils'
 
 // Luminance threshold shader - extracts bright areas
 const luminanceFragmentShader = `
@@ -186,6 +187,11 @@ export class BloomPass extends ShaderPass {
     // Prevent re-initialization
     if (this.isInitialized && this.gl === gl) return true
 
+    if (!hasGL(gl)) {
+      warnNoGL('BloomPass.init')
+      return false
+    }
+
     this.gl = gl
 
     // Initialize all internal passes
@@ -202,7 +208,10 @@ export class BloomPass extends ShaderPass {
     width: number,
     height: number
   ): { framebuffer: WebGLFramebuffer; texture: WebGLTexture } | null {
-    if (!this.gl) return null
+    if (!hasGL(this.gl)) {
+      warnNoGL('BloomPass.createBuffer')
+      return null
+    }
     const gl = this.gl
 
     const framebuffer = gl.createFramebuffer()
@@ -252,7 +261,7 @@ export class BloomPass extends ShaderPass {
   }
 
   private disposeBuffers(): void {
-    if (!this.gl) return
+    if (!hasGL(this.gl)) return
 
     const buffers = [this.brightBuffer, this.blurBuffer1, this.blurBuffer2]
     for (const buf of buffers) {

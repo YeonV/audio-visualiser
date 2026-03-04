@@ -1,7 +1,7 @@
 {
   "name": "@mattallmighty/audio-visualiser",
   "private": true,
-  "version": "0.2.5",
+  "version": "0.2.6",
   "type": "module",
   "main": "./dist/audio-visualiser.umd.js",
   "module": "./dist/audio-visualiser.es.js",

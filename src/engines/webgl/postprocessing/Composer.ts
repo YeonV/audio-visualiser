@@ -9,6 +9,7 @@
  */
 
 import { ShaderPass } from './ShaderPass'
+import { hasGL, warnNoGL } from '../glUtils'
 
 interface RenderTarget {
   framebuffer: WebGLFramebuffer
@@ -52,6 +53,10 @@ export class Composer {
    */
   private createRenderTarget(): RenderTarget | null {
     const gl = this.gl
+    if (!hasGL(gl)) {
+      warnNoGL('Composer.createRenderTarget')
+      return null
+    }
 
     // Create framebuffer
     const framebuffer = gl.createFramebuffer()
@@ -133,8 +138,10 @@ export class Composer {
     }
 
     this.copyPass = new ShaderPass(copyShader, { renderToScreen: true })
-    this.copyPass.init(this.gl)
-    this.copyPass.setSize(this.width, this.height)
+    if (this.gl && typeof this.copyPass.init === 'function') {
+      this.copyPass.init(this.gl)
+      this.copyPass.setSize(this.width, this.height)
+    }
   }
 
   /**
@@ -279,7 +286,7 @@ export class Composer {
    * Clear the input buffer
    */
   clear(color: [number, number, number, number] = [0, 0, 0, 1]): void {
-    if (!this.readTarget) return
+    if (!this.readTarget || !this.gl) return
 
     const gl = this.gl
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.readTarget.framebuffer)
@@ -292,6 +299,12 @@ export class Composer {
    * Dispose of render targets
    */
   private disposeRenderTargets(): void {
+    if (!this.gl) {
+      this.readTarget = null
+      this.writeTarget = null
+      return
+    }
+
     if (this.readTarget) {
       this.gl.deleteFramebuffer(this.readTarget.framebuffer)
       this.gl.deleteTexture(this.readTarget.texture)

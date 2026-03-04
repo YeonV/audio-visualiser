@@ -29,10 +29,12 @@ The audio visualizer is a standalone React library that builds as a dynamic modu
 └─────────────────────────────────────────────────────────────┘
                         ↓ (packaged as)
 ┌─────────────────────────────────────────────────────────────┐
-│  LedFxCC (Electron Binary)                                   │
-│  - Desktop application                                       │
-│  - Bundles backend + frontend + audio-visualizer            │
-│  - Cross-platform distribution                              │
+│  LedFxCC (Electron Binary)  — NOT a separate repo           │
+│  - Entry: frontend/src/app/electron.ts                      │
+│  - Electron main process lives inside the Frontend repo     │
+│  - isCC() detects bundled backend binary at runtime         │
+│  - Built by _pipeline/ (LedFx-Builds) via electron-builder  │
+│  - Cross-platform: Win / Mac / Linux                        │
 └─────────────────────────────────────────────────────────────┘
 ```
 

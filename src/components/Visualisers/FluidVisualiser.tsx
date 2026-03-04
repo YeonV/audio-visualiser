@@ -9,6 +9,7 @@
  */
 
 import React, { useRef, useEffect, useCallback, useState, forwardRef, useImperativeHandle } from 'react'
+import { hasGL, warnNoGL } from '../../engines/webgl/glUtils'
 import { Box, Slider, Typography, Switch, FormControlLabel, TextField } from '@mui/material'
 
 // Types
@@ -374,6 +375,11 @@ interface DoubleFBO {
 }
 
 function createFBO(gl: WebGL2RenderingContext, width: number, height: number, internalFormat: number, format: number, type: number, filter: number): FBO | null {
+  if (!hasGL(gl)) {
+    warnNoGL('createFBO')
+    return null
+  }
+
   gl.activeTexture(gl.TEXTURE0)
   const texture = gl.createTexture()
   if (!texture) return null
@@ -396,6 +402,11 @@ function createFBO(gl: WebGL2RenderingContext, width: number, height: number, in
 }
 
 function createDoubleFBO(gl: WebGL2RenderingContext, width: number, height: number, internalFormat: number, format: number, type: number, filter: number): DoubleFBO | null {
+  if (!hasGL(gl)) {
+    warnNoGL('createDoubleFBO')
+    return null
+  }
+
   const fbo1 = createFBO(gl, width, height, internalFormat, format, type, filter)
   const fbo2 = createFBO(gl, width, height, internalFormat, format, type, filter)
   if (!fbo1 || !fbo2) return null
@@ -456,7 +467,10 @@ export const FluidVisualiser = forwardRef<FluidVisualiserRef, FluidVisualiserPro
 
     const initFBOs = useCallback(() => {
       const gl = glRef.current
-      if (!gl) return
+      if (!hasGL(gl)) {
+        warnNoGL('initFBOs')
+        return
+      }
 
       const simRes = config.simResolution
       const dyeRes = config.dyeResolution
@@ -489,7 +503,7 @@ export const FluidVisualiser = forwardRef<FluidVisualiserRef, FluidVisualiserPro
 
     const dispose = useCallback(() => {
       const gl = glRef.current
-      if (!gl) return
+      if (!hasGL(gl)) return
 
       const disposeFBO = (fbo: FBO | null) => {
         if (!fbo) return
